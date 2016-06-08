@@ -165,7 +165,6 @@ namespace evo{
           output_location << header << std::endl;
           header_printed = true;
       }
-      std::cout << "In update " << update << " " << resolution << " " << update%resolution <<std::endl;
       if (update % resolution == 0){
 
         output_location << update;
@@ -291,22 +290,17 @@ using DefaultStats = StatsManager_DefaultStats<PopBasic>;
               return ShannonEntropy(*pop);
           };
           fit_stat_type max_fitness = [](fit_fun_type fit_func, POP_MANAGER * pop){
-              std::cout<<"A"<<std::endl;
               auto ans =  MaxFunctionReturn(fit_func, *pop);
-              std::cout<<"A1/2"<<std::endl;
               return ans;
           };
           fit_stat_type avg_fitness = [](fit_fun_type fit_func, POP_MANAGER * pop){
-              std::cout<<"B"<<std::endl;
               return AverageFunctionReturn(fit_func, *pop);
           };
 
           fit_stat_type non_inf = [](fit_fun_type fit_func, POP_MANAGER * pop){
-              std::cout<<"C"<<std::endl;
               return NonInf(fit_func, *pop);
           };
           fit_stat_type ben_mut = [](fit_fun_type fit_func, POP_MANAGER * pop){
-              std::cout<<"D"<<std::endl;
               MLandscape data = MutLandscape(fit_func, *pop);
               return data.benefit_avg;
           };
@@ -324,14 +318,11 @@ using DefaultStats = StatsManager_DefaultStats<PopBasic>;
           };
           fit_stat_type max_det = [](fit_fun_type fit_func, POP_MANAGER * pop){
               MLandscape data = MutLandscape(fit_func, *pop);
-              std::cout<<"HERE"<<std::endl;
               return data.max_det;
           };
           std::function<double(POP_MANAGER*)> last_coal = [this](POP_MANAGER * pop){
               int a_id = this->lin_ptr->last_coalesence;
-              std::cout<<"COAL: "<<a_id<<std::endl;
               emp::vector<int> depth = this->lin_ptr->TraceLineageIDs(a_id);
-              std::cout<<"DEPTH: "<<(double)depth.size()<<std::endl;
               return (double)depth.size();
           };
 
@@ -351,7 +342,6 @@ using DefaultStats = StatsManager_DefaultStats<PopBasic>;
           AddFunction(max_ben, "max_ben");
           AddFunction(max_det, "max_det");
 
-          std::cout<<"HEHEHEHEHee"<<std::endl;
           w->OnUpdate(UpdateFun);
 
       }
