@@ -8,12 +8,12 @@
 #ifndef EMP_CIRCLE_2D_H
 #define EMP_CIRCLE_2D_H
 
-
+#include "Shape2D.h"
 #include "Point2D.h"
 
 namespace emp {
 
-  template <typename TYPE=double> class Circle2D {
+  template <typename TYPE=double> class Circle2D : public Shape2D {
   private:
     Point2D<TYPE> center;
     TYPE radius;

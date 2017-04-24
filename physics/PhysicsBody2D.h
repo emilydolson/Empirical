@@ -1,0 +1,269 @@
+//  This file is part of Empirical, https://github.com/devosoft/Empirical
+//  Copyright (C) Michigan State University, 2016.
+//  Released under the MIT Software license; see doc/LICENSE
+//
+//
+// Body_Base is a base class, containing info unrelated to its shape or its owner.
+// It *does* contain the set of signals that might need to be triggered, such as
+// specific types of collisions.
+//
+// Body is a template class that takes SHAPE and OWNER as template arguments.
+// It creates an intenral instance of SHAPE (which has a pointer back to Body_Base)
+// and a pointer back to OWNER.
+//
+//
+//  Development notes:
+//  * If we are going to have a lot of links, we may want a better data structure than vector.
+//    (if we don't have a lot, vector may be the best choice...)
+
+#ifndef EMP_PHYSICSBODY_2D_H
+#define EMP_PHYSICSBODY_2D_H
+
+#include "../geometry/Point2D.h"
+#include "../geometry/Shape2D.h"
+
+#include "../tools/TypeTracker.h"
+
+#include <functional>
+
+namespace emp {
+  class PhysicsBody2D_Base;
+
+  // TODO: Discuss the fate of BODY_LINK_TYPE. Should we still be using this? Or is there something
+  //  better?
+  //  * We need a way to handle different types of links.
+  // At the moment, bodies can be linked in several ways.
+  // DEFAULT -> Joined together with no extra meaning
+  // REPRODUCTION -> "from" is gestating "to"
+  // ATTACK -> "from" is trying to eat "to"
+  // PARASITE -> "from" is stealing resources from "to"
+  // CONSUME_RESOURCE -> "from" is eating "to" where "from" is an organism and "to" is a resource.
+  enum class BODY_LINK_TYPE { DEFAULT, REPRODUCTION, ATTACK, PARASITE, CONSUME_RESOURCE };
+
+  // Physics bodies can have links between one another.
+  struct BodyLink {
+    using PhysicsBody_t = PhysicsBody2D_Base;
+    BODY_LINK_TYPE type;
+    PhysicsBody_t * from;
+    PhysicsBody_t * to;
+    double cur_dist;
+    double target_dist;
+    double link_strength;
+    bool destroy;
+    BodyLink() : type(BODY_LINK_TYPE::DEFAULT), from(nullptr), to(nullptr), cur_dist(0),
+                 target_dist(0), link_strength(0), destroy(false) { ; }
+    BodyLink(BODY_LINK_TYPE t, PhysicsBody_t * _from, PhysicsBody_t * _to, double _cur_dist = 0,
+              double _target_dist = 0, double _link_strength = 0)
+              : type(t), from(_from), to(_to), cur_dist(_cur_dist), target_dist(_target_dist),
+                link_strength(_link_strength), destroy(false) { ; }
+    ~BodyLink() { ; }
+  };
+
+  class PhysicsBody2D_Base {
+  protected:
+    // Body properties:
+    Point velocity; // Speed and direction of movement.
+    double mass;
+    double inv_mass;
+    double pressure;
+    double max_pressure;
+    bool destroy; // Has this body been flagged for destruction?
+    bool is_colliding;
+    // Useful internal member variables:
+    Point shift;            // How should this body be updated to minimize overlap?
+    Point cum_shift;        // Build up of shift not yet acted upon.
+    Point total_abs_shift;  // Total absolute-value of shifts (to calculate pressure)
+
+    // Signals:
+    // TODO
+
+    // Information about other bodies that this body is linked to:
+    emp::vector<BodyLink*> from_links;  // Active links initiated (from) this body.
+    emp::vector<BodyLink*> to_links;    // Active links targeting (to) this body.
+
+    void RemoveFromLink(int link_id) {
+      emp_assert(link_id >= 0 && link_id < (int) from_links.size());
+      from_links[link_id] = from_links.back();
+      from_links.pop_back();
+    }
+
+    void RemoveToLink(int link_id) {
+      emp_assert(link_id >= 0 && link_id < (int) to_links.size());
+      to_links[link_id] = to_links.back();
+      to_links.pop_back();
+    }
+
+    PhysicsBody2D_Base() : mass(1.0), inv_mass(1.0 / mass), pressure(0.0), max_pressure(1.0), destroy(false) { ; }
+
+  public:
+    virtual ~PhysicsBody2D_Base() {
+      // Delete all links
+      // TODO
+    }
+
+    virtual Shape * GetShapePtr() = 0;
+    virtual Shape & GetShape() = 0;
+    virtual const Shape & GetConstShape() const = 0;
+
+    virtual const Point & GetVelocity() const { return velocity; }
+    virtual const Point & GetAnchor() const = 0;
+    virtual double GetMass() const { return mass; }
+    virtual double GetInvMass() const { return inv_mass; }
+    virtual double GetPressure() const { return pressure; }
+    virtual double GetMaxPressure() const { return max_pressure; }
+    virtual bool GetDestroyFlag() const { return destroy; }
+    virtual bool ExceedsStressThreshold() const { return pressure > max_pressure; }
+    virtual bool IsColliding() const { return is_colliding; }
+
+    virtual void SetVelocity(double x, double y) { velocity.Set(x, y); }
+    virtual void SetVelocity(const Point & v) { velocity = v; }
+    virtual void SetMass(double m) { mass = m; mass == 0.0 ? inv_mass = 0 : inv_mass = 1.0 / mass; }
+    virtual void SetPressure(double p) { pressure = p; }
+    virtual void SetMaxPressure(double mp) { max_pressure = mp; }
+    virtual void FlagForDestruction() { destroy = true; }
+
+    virtual void IncVelocity(const Point & offset) { velocity += offset; }
+    virtual void DecVelocity(const Point & offset) { velocity -= offset; }
+    virtual void AddShift(const Point & s) { shift += s; total_abs_shift += s.Abs(); }
+
+    virtual void ResolveCollision() { is_colliding = true; }
+    virtual void TriggerCollision(PhysicsBody2D_Base * other_body) {
+      // TODO
+      is_colliding = true;
+      //on_collision_signal.Trigger(other_body);
+    }
+
+    // TODO: register collision callbacks.
+
+    // Creating, testing, and unlinking other bodies.
+    virtual bool IsLinkedFrom(const PhysicsBody2D_Base & link_body) const {
+      for (auto * cur_link : from_links) if (cur_link->to == &link_body) return true;
+      return false;
+    }
+    virtual bool IsLinkedTo(const PhysicsBody2D_Base & link_body) const { return link_body.IsLinkedFrom(*this); }
+    virtual bool IsLinked(const PhysicsBody2D_Base & link_body) const {
+      return IsLinkedFrom(link_body) || IsLinkedTo(link_body);
+    }
+    virtual int GetLinkCount() const { return (int) (from_links.size() + to_links.size()); }
+
+    // Add link FROM this TO link_body.
+    virtual void AddLink(BODY_LINK_TYPE type, PhysicsBody2D_Base & link_body, double cur_dist, double target_dist, double link_strength = 0) {
+      emp_assert(!IsLinked(link_body)); // Don't link twice!
+      // Build connections in both directions.
+      auto * new_link = new BodyLink(type, this, &link_body, cur_dist, target_dist, link_strength);
+      from_links.push_back(new_link);
+      link_body.to_links.push_back(new_link);
+    }
+    virtual void RemoveLink(BodyLink * link) {
+      // If link is to this body, trigger remove link from source body.
+      if (link->to == this) {
+        link->from->RemoveLink(link);
+        return;
+      }
+      // Otherwise, handle link cleanup here.
+      // Remove the FROM link.
+      for (int i = 0; i < (int) from_links.size(); i++) {
+        if (from_links[i]->to == link->to) { RemoveFromLink(i); break; }
+      }
+      // Remove the TO link.
+      const int to_size = (int) link->to->to_links.size();
+      for (int i = 0; i < to_size; i++) {
+        if (link->to->to_links[i]->from == this) { link->to->RemoveToLink(i); break; }
+      }
+      delete link;
+    }
+    virtual void RemoveAllLinks() {
+      while (from_links.size()) RemoveLink(from_links[0]);
+      while (to_links.size()) RemoveLink(to_links[0]);
+    }
+    virtual const BodyLink & FindLink(const PhysicsBody2D_Base & link_body) const {
+      emp_assert(IsLinked(link_body));
+      for (auto * link : from_links) if ( link->to == &link_body) return *link;
+      return link_body.FindLink(*this);
+    }
+    virtual BodyLink & FindLink(PhysicsBody2D_Base & link_body)  {
+      emp_assert(IsLinked(link_body));
+      for (auto * link : from_links) if ( link->to == &link_body) return *link;
+      return link_body.FindLink(*this);
+    }
+    virtual emp::vector<BodyLink *> GetLinksToByType(BODY_LINK_TYPE link_type) {
+      emp::vector<BodyLink *> links;
+      for (auto *link : this->to_links) {
+        if (link->type == link_type) links.push_back(link);
+      }
+      return links;
+    }
+    virtual emp::vector<BodyLink *> GetLinksFromByType(BODY_LINK_TYPE link_type) {
+      emp::vector<BodyLink *> links;
+      for (auto *link : this->from_links) {
+        if (link->type == link_type) links.push_back(link);
+      }
+      return links;
+    }
+    virtual double GetLinkDist(const PhysicsBody2D_Base & link_body) const {
+      emp_assert(IsLinked(link_body));
+      return FindLink(link_body).cur_dist;
+    }
+    virtual double GetTargetLinkDist(const PhysicsBody2D_Base & link_body) const {
+      emp_assert(IsLinked(link_body));
+      return FindLink(link_body).target_dist;
+    }
+    virtual void ShiftLinkDist(PhysicsBody2D_Base & link_body, double change) {
+      auto & link = FindLink(link_body);
+      link.cur_dist += change;
+    }
+  };
+
+  // Bodies can be different shapes and have owners.
+  //  * Shape type comes in on template.
+  //  * Owner must be TrackedType
+  template<typename SHAPE_TYPE>
+  class PhysicsBody2D : public PhysicsBody2D_Base {
+  protected:
+    using Shape_t = SHAPE_TYPE;
+
+    Shape_t * shape_ptr;
+    TrackedType * tracked_owner;
+    bool has_owner;
+
+
+  public:
+    template<typename... ARGS>
+    PhysicsBody2D(ARGS... args) : tracked_owner(nullptr), has_owner(false) {
+      shape_ptr = new Shape_t(this, std::forward<ARGS>(args)...);
+    }
+    ~PhysicsBody2D() {
+      delete shape_ptr;
+    }
+
+    Shape_t * GetShapePtr() override { return shape_ptr; }
+    Shape_t & GetShape() override { return *shape_ptr; }
+    const Shape_t & GetConstShape() const override { return *shape_ptr; }
+
+    TrackedType * GetTrackedOwnerPtr() { return tracked_owner; }
+
+    bool HasOwner() const { return has_owner; }
+
+    const Angle & GetOrientation() const { return shape_ptr->GetOrientation(); }
+    const Point & GetAnchor() const override { return shape_ptr->GetCenter(); }
+
+    void AttachTrackedOwner(TrackedType * ptr) {
+      emp_assert(ptr != nullptr && has_owner != true);
+      tracked_owner = ptr;
+      has_owner = true;
+    }
+
+    void DetachTrackedOwner() {
+      tracked_owner = nullptr;
+      has_owner = false;
+    }
+
+    void BodyUpdate() {
+      // TODO: write this.
+    }
+
+  };
+}
+
+
+#endif
