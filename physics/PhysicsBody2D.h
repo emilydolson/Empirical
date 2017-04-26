@@ -76,6 +76,7 @@ namespace emp {
 
     // Signals:
     // TODO
+    //Signal<void(BodyLink*)> on_link_update_signal;
 
     // Information about other bodies that this body is linked to:
     emp::vector<BodyLink*> from_links;  // Active links initiated (from) this body.
@@ -230,7 +231,7 @@ namespace emp {
   public:
     template<typename... ARGS>
     PhysicsBody2D(ARGS... args) : tracked_owner(nullptr), has_owner(false) {
-      shape_ptr = new Shape_t(this, std::forward<ARGS>(args)...);
+      shape_ptr = new Shape_t(std::forward<ARGS>(args)...);
     }
     ~PhysicsBody2D() {
       delete shape_ptr;
@@ -258,10 +259,26 @@ namespace emp {
       has_owner = false;
     }
 
-    void BodyUpdate() {
-      // TODO: write this.
+    // Update body.
+    void Update(double friction = 0) {
+      // Update links.
+      for (int i = 0; i < (int) from_links.size(); ++i) {
+        auto *link = from_links[i];
+        // Is this link flagged for destruction?
+        if (link->destroy) {
+          RemoveLink(link);
+          continue;
+        }
+      }
+      // Move body by its velocity modified by friction.
+      if (velocity.NonZero()) {
+        shape_ptr->Translate(velocity);
+        const double velocity_mag = velocity.Magnitude();
+        // If body is about to stop, go ahead and stop it.
+        if (friction > velocity_mag) velocity.ToOrigin();
+        else velocity *= 1.0 - (friction / velocity_mag);
+      }
     }
-
   };
 }
 
