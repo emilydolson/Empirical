@@ -21,8 +21,10 @@
 
 #include "../geometry/Point2D.h"
 #include "../geometry/Shape2D.h"
+#include "../control/Signal.h"
 
 #include "../tools/TypeTracker.h"
+#include "PhysicsBodyOwner.h"
 
 #include <functional>
 
@@ -76,7 +78,7 @@ namespace emp {
 
     // Signals:
     // TODO
-    //Signal<void(BodyLink*)> on_link_update_signal;
+    Signal<void(BodyLink*)> on_link_update_signal;  // Triggers for each link updated on body.
 
     // Information about other bodies that this body is linked to:
     emp::vector<BodyLink*> from_links;  // Active links initiated (from) this body.
@@ -134,7 +136,10 @@ namespace emp {
       //on_collision_signal.Trigger(other_body);
     }
 
-    // TODO: register collision callbacks.
+    // TODO: register more callbacks.
+    virtual void RegisterOnLinkUpdateCallback(std::function<void(BodyLink*)> callback) {
+      on_link_update_signal.AddAction(callback);
+    }
 
     // Creating, testing, and unlinking other bodies.
     virtual bool IsLinkedFrom(const PhysicsBody2D_Base & link_body) const {
@@ -222,9 +227,11 @@ namespace emp {
   class PhysicsBody2D : public PhysicsBody2D_Base {
   protected:
     using Shape_t = SHAPE_TYPE;
+    using Owner_t = PhysicsBodyOwner_Base<PhysicsBody2D<Shape_t>>;
 
     Shape_t * shape_ptr;
     TrackedType * tracked_owner;
+    Owner_t *body_owner;
     bool has_owner;
 
 
@@ -235,6 +242,9 @@ namespace emp {
     }
     ~PhysicsBody2D() {
       delete shape_ptr;
+      // TODO: we need to tell owner (if we have an owner) that we've deleted this body.
+      //      * Currently not a huge fan of this way of doing it.
+      if (has_owner) body_owner->DetachBody();
     }
 
     Shape_t * GetShapePtr() override { return shape_ptr; }
@@ -253,9 +263,16 @@ namespace emp {
       tracked_owner = ptr;
       has_owner = true;
     }
+    void AttachTrackedOwner(TrackedType *ptr, Owner_t *o_ptr) {
+      emp_assert(ptr != nullptr && has_owner != true);
+      tracked_owner = ptr;
+      body_owner = o_ptr;
+      has_owner = true;
+    }
 
     void DetachTrackedOwner() {
       tracked_owner = nullptr;
+      body_owner = nullptr;
       has_owner = false;
     }
 
@@ -264,6 +281,8 @@ namespace emp {
       // Update links.
       for (int i = 0; i < (int) from_links.size(); ++i) {
         auto *link = from_links[i];
+        // Trigger on link update.
+        on_link_update_signal.Trigger(link);
         // Is this link flagged for destruction?
         if (link->destroy) {
           RemoveLink(link);

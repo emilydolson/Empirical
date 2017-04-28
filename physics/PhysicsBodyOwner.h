@@ -44,6 +44,7 @@ namespace emp {
       has_body = true;
     }
     virtual void DetachBody() {
+      if (has_body) body->DetachTrackedOwner();
       body = nullptr;
       has_body = false;
     }

@@ -23,6 +23,7 @@
 #include "../control/SignalControl.h"
 
 #include "PhysicsBody2D.h"
+#include "PhysicsBodyOwner.h"
 
 #include <algorithm>
 
@@ -217,7 +218,9 @@ namespace emp {
 
     CirclePhysics2D & Clear() {
       // @amlalejini: For now, physics is responsible for deleting bodies managed by physics.
-      for (auto * body : body_set) delete body;
+      for (auto * body : body_set) {
+        delete body;
+      }
       body_set.resize(0);
       return *this;
     }
@@ -249,7 +252,9 @@ namespace emp {
       Body_t * body_ptr = body_owner->GetBodyPtr();
       body_owner->SetBodyCleanup(false); // Physics will take cleanup responsibility.
       // Make sure we attach body to (tracked) owner.
-      body_ptr->AttachTrackedOwner(body_owner_tt.template New<OWNER_TYPE*>(body_owner));
+      //body_ptr->AttachTrackedOwner(body_owner_tt.template New<OWNER_TYPE*>(body_owner));
+      // TODO: make this less gross.
+      body_ptr->AttachTrackedOwner(body_owner_tt.template New<OWNER_TYPE*>(body_owner), body_owner);
       body_set.push_back(body_ptr);
       return *this;
     }
