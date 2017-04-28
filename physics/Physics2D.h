@@ -15,8 +15,11 @@
 #include "../tools/Random.h"
 #include "../tools/TypeTracker.h"
 
+#include "../meta/meta.h"
+
 #include "../geometry/Circle2D.h"
 #include "../geometry/Point2D.h"
+
 #include "../control/SignalControl.h"
 
 #include "PhysicsBody2D.h"
@@ -31,6 +34,7 @@ namespace emp {
     using Shape_t = Circle;
     using Body_t = PhysicsBody2D<Shape_t>;
     using Tracker_t = TypeTracker<BODY_OWNERS*...>;
+    using CollisionResolutionFunction_t = std::function<void(Body_t *, Body_t *)>;
 
     Tracker_t body_owner_tt;
     emp::vector<Body_t*> body_set;
@@ -42,6 +46,8 @@ namespace emp {
     Random *random_ptr;
 
     Signal<void()> on_update_signal;
+
+    CollisionResolutionFunction_t CollisionResolutionFunction;
 
     // Internal functions
     // Update all bodies.
@@ -67,6 +73,7 @@ namespace emp {
           ++cur_id;
         }
       }
+      body_set.resize(cur_size);
     }
 
     void TestCollisions() {
@@ -103,17 +110,85 @@ namespace emp {
     }
 
     bool CollideBodies(Body_t *body1, Body_t *body2) {
-      // TODO
+      // This is the narrow phase of collision detection/resolution between body1 & body2.
+      //  (In circle physics, all bodies are circles.)
+      // @amlalejini: Do we want links to imply no collision going forward? Maximal flexibility
+      //   on collision resolution seems best. Some types of links might want to collide?
+      // If bodies are linked, no collision.
+      if (body1->IsLinked(*body2)) return false;
+      // First: Body-touching math.
+      Point dist = body1->GetShape().GetCenter() - body2->GetShape().GetCenter();
+      const double sq_pair_dist = dist.SquareMagnitude();
+      const double radius_sum = body1->GetShape().GetRadius() + body2->GetShape().GetRadius();
+      const double sq_min_dist = radius_sum * radius_sum;
+      // No touching, no collision.
+      if (sq_pair_dist >= sq_min_dist) return false;
+      // Must be touching, collision!
+      body1->TriggerCollision(body2);   // Give bodies opportunity to respond to the collision.
+      body2->TriggerCollision(body1);
+      // Give owners opportunity to respond to collision. TODO: what if no owners?
+      if (body1->IsColliding() || body2->IsColliding())
+        body_owner_tt.RunFunction(body1->GetTrackedOwnerPtr(), body2->GetTrackedOwnerPtr());
+      // If collision is not resolved yet, fall back to default behavior.
+      if (body1->IsColliding() || body2->IsColliding())
+        this->CollisionResolutionFunction(body1, body2);
       return true;
+    }
+
+    // Default collision resolution function
+    //  - Simple impulse resolution.
+    //  - Currently no support for rotational velocity.
+    void DefaultCollisionResolution(Body_t *body1, Body_t *body2) {
+      // TODO: @amlalejini: This math is redundant. Could have a collision info struct that gets passed around.
+      Point dist = body1->GetShape().GetCenter() - body2->GetShape().GetCenter();
+      double sq_pair_dist = dist.SquareMagnitude();
+      const double radius_sum = body1->GetShape().GetRadius() + body2->GetShape().GetRadius();
+      const double sq_min_dist = radius_sum * radius_sum;
+      // If bodies are directly (and centered) on top of one another, shift one such that they are no longer on top of each other.
+      if (sq_pair_dist == 0.0) {
+        body2->GetShape().Translate(Point(0.01, 0.01));
+        dist = body1->GetShape().GetCenter() - body2->GetShape().GetCenter();
+        sq_pair_dist = dist.SquareMagnitude();
+      }
+      // Re-adjust position to remove overlap.
+      const double true_dist = sqrt(sq_pair_dist);
+      const double overlap_dist = ((double)radius_sum) - true_dist;
+      const double overlap_frac = overlap_dist / true_dist;
+      const Point cur_shift = dist * (overlap_frac / 2.0);
+      body1->AddShift(cur_shift);
+      body2->AddShift(-cur_shift);
+      // Resolve collision using impulse resolution.
+      const double coeff_of_restitution = 1.0;
+      const Point collision_normal(dist / true_dist);
+      const Point rel_velocity(body1->GetVelocity() - body2->GetVelocity());
+      const double velocity_along_normal = (rel_velocity.GetX() * collision_normal.GetX())
+                                         + (rel_velocity.GetY() * collision_normal.GetY());
+      // If velocities are separating, we can go ahead and resolve the collision.
+      if (velocity_along_normal > 0) {
+        body1->ResolveCollision(); body2->ResolveCollision();
+        return;
+      }
+      double j = -(1 + coeff_of_restitution) * velocity_along_normal; // Calculate j, the impulse scalar.
+      j /= body1->GetInvMass() + body2->GetInvMass();
+      const Point impulse(collision_normal * j);
+      // Apply the impulse.
+      body1->SetVelocity(body1->GetVelocity() + (impulse * body1->GetInvMass()));
+      body2->SetVelocity(body2->GetVelocity() - (impulse * body2->GetInvMass()));
+      // Mark collision as resolved.
+      body1->ResolveCollision(); body2->ResolveCollision();
+    }
+
+    void FinalizeBodies() {
+      for (auto *body : body_set) body->FinalizePosition(*max_pos);
     }
 
   public:
     CirclePhysics2D(): max_radius(0), friction(0), configured(false) {
-      //emp_assert(sizeof...(BODY_OWNERS) > 0); (TODO:? @amlalejini: should we allow empty body owners -- probably.)
+      emp_assert(sizeof...(BODY_OWNERS) > 0); // (TODO:? @amlalejini: should we allow for bodies with no owners?)
     }
 
     CirclePhysics2D(double width, double height, Random *r, double _friction) {
-      //emp_assert(sizeof...(BODY_OWNERS) > 0); (TODO:?)
+      emp_assert(sizeof...(BODY_OWNERS) > 0); // (TODO: @amlalejini: see todo from default constructor)
       ConfigPhysics(width, height, r, _friction);
     }
 
@@ -123,8 +198,24 @@ namespace emp {
       Clear();
     }
 
+    // Call GetTypeID<type_name>() to get the ID associated with owner type type_name.
+    template<typename T>
+    constexpr static int GetTypeID() { return get_type_index<T, BODY_OWNERS...>(); }
+    // Call GetTypeID(owner) to get the ID associated with 'owner'.
+    template <typename T>
+    constexpr static int GetTypeID(const T &) { return get_type_index<T, BODY_OWNERS...>(); }
+    // Given a body and a BODY_OWNER type, is the body's owner of type BODY_OWNER?
+    template <typename BODY_OWNER>
+    bool IsBodyOwnerType(Body_t *body) {
+      return body_owner_tt.template IsType<BODY_OWNER*>(*(body->GetTrackedOwnerPtr()));
+    }
+    // Cast body to type BODY_OWNER.
+    template <typename BODY_OWNER>
+    BODY_OWNER * ToBodyOwnerType(Body_t *body) {
+      return body_owner_tt.template ToType<BODY_OWNER*>(*(body->GetTrackedOwnerPtr()));
+    }
+
     CirclePhysics2D & Clear() {
-      std::cout << "Clear physics!" << std::endl;
       // @amlalejini: For now, physics is responsible for deleting bodies managed by physics.
       for (auto * body : body_set) delete body;
       body_set.resize(0);
@@ -142,6 +233,8 @@ namespace emp {
       if (configured) {
         delete max_pos;
       }
+      CollisionResolutionFunction = [this](Body_t *body1, Body_t *body2)
+                                          { this->DefaultCollisionResolution(body1, body2); };
       max_pos = new Point(width, height);
       random_ptr = r;
       configured = true;
@@ -161,13 +254,6 @@ namespace emp {
       return *this;
     }
 
-    // If we're just working with (ownerless) bodies, use this function.
-    CirclePhysics2D & AddBody(Body_t * body) {
-      emp_assert(configured);
-      body_set.push_back(body);
-      return *this;
-    }
-
     template <typename OWNER_TYPE>
     CirclePhysics2D & RemoveBody(OWNER_TYPE * body_owner) {
       emp_assert(configured);
@@ -182,11 +268,26 @@ namespace emp {
       return *this;
     }
 
-    CirclePhysics2D & RemoveBody(Body_t * body) {
-      emp_assert(configured);
-      // Delete from body list.
-      body_set.erase(std::remove_if(body_set.begin(), body_set.end(), [body](Body_t *body_i) { return body_i == body; }));
-      return *this;
+    // Callback registration.
+    void RegisterOnUpdateCallback(std::function<void()> callback) {
+      on_update_signal.AddAction(callback);
+    }
+
+    // Handler registration.
+    template <typename T1, typename T2>
+    void RegisterCollisionHandler(std::function<void(T1*, T2*)> fun) {
+      emp_assert(GetTypeID<T1>() >= 0 && GetTypeID<T2>() >= 0);
+      body_owner_tt.AddFunction(fun);
+      // If types are not the same, register same function but with diff arg ordering.
+      if (GetTypeID<T1>() != GetTypeID<T2>()) {
+        std::function<void(T2*, T1*)> f2 = [fun](T2 *t2, T1 *t1) { fun(t1, t2); };
+        body_owner_tt.AddFunction(f2);
+      }
+    }
+
+    // Allow setting of default collision resolution function.
+    void SetDefaultCollisionResolutionFunction(CollisionResolutionFunction_t fun) {
+      CollisionResolutionFunction = fun;
     }
 
     // Progress physics by a single time step.
@@ -199,11 +300,11 @@ namespace emp {
       //  -- Advance physics body motions by 1 timestep, remove bodies flagged for destruction, update max radius.
       max_radius = 0;
       UpdateBodies();
-      // TODO: Test for collisions.
-      TestCollisions();
-      // TODO: Cleanup.
+      // Test for collisions, resolving any found.
+      if (max_radius > 0.0) TestCollisions();
+      // Finalize bodies for this update (cleanup).
+      FinalizeBodies();
     }
-
   };
 
 }

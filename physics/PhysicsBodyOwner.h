@@ -26,6 +26,9 @@ namespace emp {
       if (has_body && body_cleanup) {
         delete body;
         DetachBody();
+      } else if (has_body && !body_cleanup) {
+        body->FlagForDestruction();
+        DetachBody();
       }
     }
 
@@ -45,9 +48,13 @@ namespace emp {
       has_body = false;
     }
     virtual void Evaluate() {
-      if (body->GetDestroyFlag()) {
-        delete body;
-        DetachBody();
+      if (has_body) {
+        if (body->GetDestroyFlag() && body_cleanup) {
+          delete body;
+          DetachBody();
+        } else if (body->GetDestroyFlag() && !body_cleanup) {
+          DetachBody();
+        }
       }
     }
   };

@@ -99,7 +99,7 @@ namespace emp {
   public:
     virtual ~PhysicsBody2D_Base() {
       // Delete all links
-      // TODO
+      RemoveAllLinks();
     }
 
     virtual Shape * GetShapePtr() = 0;
@@ -269,6 +269,16 @@ namespace emp {
           RemoveLink(link);
           continue;
         }
+        if (link->cur_dist == link->target_dist) continue;  // No adjustment needed.
+        // If we're within the change_factor, just set the pair_dist to target.
+        // TODO: get rid of magic numbers (how much should current distance be allowed to change per physics update).
+        const double change_factor = 0.25;
+        if (std::abs(link->cur_dist - link->target_dist) <= change_factor) {
+            link->cur_dist = link->target_dist;
+        } else {
+          if (link->cur_dist < link->target_dist) link->cur_dist += change_factor;
+          else link->cur_dist -= change_factor;
+        }
       }
       // Move body by its velocity modified by friction.
       if (velocity.NonZero()) {
@@ -277,6 +287,53 @@ namespace emp {
         // If body is about to stop, go ahead and stop it.
         if (friction > velocity_mag) velocity.ToOrigin();
         else velocity *= 1.0 - (friction / velocity_mag);
+      }
+    }
+
+    // Finalize body's position in world for physics update.
+    void FinalizePosition(const Point & max_coords) {
+      // What's the max x,y that this body is allowed to have?
+      const double max_x = max_coords.GetX() - shape_ptr->GetRadius();
+      const double max_y = max_coords.GetY() - shape_ptr->GetRadius();
+
+      // Handle accumulated shift.
+      cum_shift += shift;
+      shape_ptr->Translate(cum_shift);
+      cum_shift.ToOrigin();
+
+      // Calculate pressure (TODO: we might want to reconsider how this gets computed?)
+      pressure = (total_abs_shift - shift.Abs()).SquareMagnitude();
+      shift.ToOrigin();
+      total_abs_shift.ToOrigin();
+
+      // If this body is linked to another, enforce the distance between them.
+      for (auto *link : from_links) {
+        // If bodies are directly on top of one another (centers are overlapping), move this a bit.
+        if (GetAnchor() == link->to->GetAnchor()) shape_ptr->Translate(Point(0.01, 0.01));
+        // Figure out how much each body needs to move so that cur_dist (updated during body update step) will be correct.
+        const double start_dist = GetAnchor().Distance(link->to->GetAnchor());
+        const double link_dist = link->cur_dist;
+        const double frac_change = (1.0 - (link_dist / start_dist)) / 2.0;
+        // Move things as necessary.
+        Point dist_move = (GetAnchor() - link->to->GetAnchor()) * frac_change;
+        shape_ptr->Translate(-dist_move);
+        link->to->GetShapePtr()->Translate(dist_move);
+      }
+
+      // Adjust the organism so it stays within the bounding box of the world.
+      if (shape_ptr->GetCenterX() < shape_ptr->GetRadius()) {
+        shape_ptr->SetCenterX(shape_ptr->GetRadius());
+        velocity.NegateX();
+      } else if (shape_ptr->GetCenterX() > max_x) {
+        shape_ptr->SetCenterX(max_x);
+        velocity.NegateX();
+      }
+      if (shape_ptr->GetCenterY() < shape_ptr->GetRadius()) {
+        shape_ptr->SetCenterY(shape_ptr->GetRadius());
+        velocity.NegateY();
+      } else if (shape_ptr->GetCenterY() > max_y) {
+        shape_ptr->SetCenterY(max_y);
+        velocity.NegateY();
       }
     }
   };
