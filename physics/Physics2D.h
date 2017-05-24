@@ -8,6 +8,7 @@
 //  This describes environment physics.
 //  TODO:
 //    * Can we setup to handle both owned and ownerless bodies? -- currently no.
+//    * How do we want to hangle immobile objects?
 
 #ifndef EMP_PHYSICS_2D_H
 #define EMP_PHYSICS_2D_H

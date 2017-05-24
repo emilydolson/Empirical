@@ -70,6 +70,7 @@ namespace emp {
     double pressure;
     double max_pressure;
     bool destroy; // Has this body been flagged for destruction?
+    bool is_immobile;
     bool is_colliding;
     // Useful internal member variables:
     Point shift;            // How should this body be updated to minimize overlap?
@@ -96,7 +97,7 @@ namespace emp {
       to_links.pop_back();
     }
 
-    PhysicsBody2D_Base() : mass(1.0), inv_mass(1.0 / mass), pressure(0.0), max_pressure(1.0), destroy(false) { ; }
+    PhysicsBody2D_Base() : mass(1.0), inv_mass(1.0 / mass), pressure(0.0), max_pressure(1.0), destroy(false), is_immobile(false) { ; }
 
   public:
     virtual ~PhysicsBody2D_Base() {
@@ -117,6 +118,7 @@ namespace emp {
     virtual bool GetDestroyFlag() const { return destroy; }
     virtual bool ExceedsStressThreshold() const { return pressure > max_pressure; }
     virtual bool IsColliding() const { return is_colliding; }
+    virtual bool IsImmobile() const { return is_immobile; }
 
     virtual void SetVelocity(double x, double y) { velocity.Set(x, y); }
     virtual void SetVelocity(const Point & v) { velocity = v; }
@@ -124,6 +126,7 @@ namespace emp {
     virtual void SetPressure(double p) { pressure = p; }
     virtual void SetMaxPressure(double mp) { max_pressure = mp; }
     virtual void FlagForDestruction() { destroy = true; }
+    virtual void SetImmobile(bool im) { is_immobile = im; }
 
     virtual void IncVelocity(const Point & offset) { velocity += offset; }
     virtual void DecVelocity(const Point & offset) { velocity -= offset; }
@@ -300,7 +303,7 @@ namespace emp {
         }
       }
       // Move body by its velocity modified by friction.
-      if (velocity.NonZero()) {
+      if (!is_immobile && velocity.NonZero()) {
         shape_ptr->Translate(velocity);
         const double velocity_mag = velocity.Magnitude();
         // If body is about to stop, go ahead and stop it.
@@ -316,9 +319,11 @@ namespace emp {
       const double max_y = max_coords.GetY() - shape_ptr->GetRadius();
 
       // Handle accumulated shift.
-      cum_shift += shift;
-      shape_ptr->Translate(cum_shift);
-      cum_shift.ToOrigin();
+      if (!is_immobile) {
+        cum_shift += shift;
+        shape_ptr->Translate(cum_shift);
+        cum_shift.ToOrigin();
+      }
 
       // Calculate pressure (TODO: we might want to reconsider how this gets computed?)
       pressure = (total_abs_shift - shift.Abs()).SquareMagnitude();
