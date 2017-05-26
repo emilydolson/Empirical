@@ -1,5 +1,6 @@
 # Flags to use regardless of compiler
-CFLAGS_all := -std=c++14 -Wall -Wno-unused-function -I../../
+CFLAGS_all := -Wall -Wno-unused-function -I../../
+CFLAGS_version := -std=c++14
 
 # Emscripten compiler information
 CXX_web := emcc
@@ -8,35 +9,31 @@ CXX_native := g++
 OFLAGS_native_debug := -g -pedantic -DEMP_TRACK_MEM  -Wnon-virtual-dtor -Wcast-align -Woverloaded-virtual -Wconversion -Weffc++
 OFLAGS_native_opt := -O3 -DNDEBUG
 
-OFLAGS_web_debug := -g4 -pedantic -Wno-dollar-in-identifier-extension -s TOTAL_MEMORY=67108864 -s ASSERTIONS=2 -s DEMANGLE_SUPPORT=1  -DEMP_TRACK_MEM  -Wnon-virtual-dtor -Wcast-align -Woverloaded-virtual -Wconversion -Weffc++
- # -s SAFE_HEAP=1
+OFLAGS_web_debug := -g4 -pedantic -Wno-dollar-in-identifier-extension -s TOTAL_MEMORY=67108864 -s ASSERTIONS=2 -s DEMANGLE_SUPPORT=1 # -s SAFE_HEAP=1
 OFLAGS_web_opt := -Os -DNDEBUG -s TOTAL_MEMORY=67108864
 
 CFLAGS_native_debug := $(CFLAGS_all) $(OFLAGS_native_debug)
 CFLAGS_native_opt := $(CFLAGS_all) $(OFLAGS_native_opt)
-CFLAGS_native := $(CFLAGS_native_opt)
 
 CFLAGS_web_debug := $(CFLAGS_all) $(OFLAGS_web_debug) --js-library ../../web/library_emp.js -s EXPORTED_FUNCTIONS="['_main', '_empCppCallback']" -s NO_EXIT_RUNTIME=1
 CFLAGS_web_opt := $(CFLAGS_all) $(OFLAGS_web_opt) --js-library ../../web/library_emp.js -s EXPORTED_FUNCTIONS="['_main', '_empCppCallback']" -s NO_EXIT_RUNTIME=1
+#CFLAGS_web := $(CFLAGS_all) $(OFLAGS_web) --js-library ../../web/library_emp.js -s EXPORTED_FUNCTIONS="['_main', '_empCppCallback']" -s DISABLE_EXCEPTION_CATCHING=1 -s NO_EXIT_RUNTIME=1
 
+TARGETS := config ConfigLexer ConfigParser
 
-JS_TARGETS := Animate.js Animate2.js Attributes.js Canvas.js DP.js Example.js Graph.js keypress.js Slate.js Sudoku.js Table.js TextArea.js Tween.js Web.js
+CONFIG := ../../config
 
-TARGETS := debug-Animate debug-keypress debug-Slate debug-web
+default: native
 
-default: web
+CXX := $(CXX_native)
+CFLAGS := $(CFLAGS_native_opt)
 
-WEB := ../../web
-
-CXX := $(CXX_web)
-CFLAGS_web := $(CFLAGS_web_opt)
-
-debug: CFLAGS_web := $(CFLAGS_web_debug)
-debug: $(JS_TARGETS)
+debug: CFLAGS := $(CFLAGS_native_debug)
+debug: all
 
 web: CXX := $(CXX_web)
-web: CFLAGS_web := $(CFLAGS_web_opt)
-web: $(JS_TARGETS)
+web: CFLAGS := $(CFLAGS_web_opt)
+web: all
 
 web-debug: CXX := $(CXX_web)
 web-debug: CFLAGS := $(CFLAGS_web_debug)
@@ -46,15 +43,17 @@ native: all
 
 all: $(TARGETS)
 
-$(JS_TARGETS): %.js : %.cc # $(WEB)/%.h
-	$(CXX_web) $(CFLAGS_web) $< -o $@
+$(TARGETS): % : %.cc $(CONFIG)/%.h
+	$(CXX) $(CFLAGS_version) $(CFLAGS) $< -o $@
 
+opt-%: %.cc $(CONFIG)/%.h
+	$(CXX) $(CFLAGS_version) $(CFLAGS_native_opt) $< -o $@
 
-debug-%: $*.cc
-	$(CXX_native) $(CFLAGS_native) $< -o $@
+debug-%: %.cc $(CONFIG)/%.h
+	$(CXX) $(CFLAGS_version) $(CFLAGS_native_debug) $< -o $@
 
 clean:
-	rm -f debug-* $(JS_TARGETS) *.js.map *.js.mem *~ source/*.o source/*/*.o
+	rm -rf debug-* *~ *.dSYM $(TARGETS)
 
 # Debugging information
 #print-%: ; @echo $*=$($*)
