@@ -27,6 +27,7 @@
 #define EMP_SURFACE_2D_H
 
 #include "../tools/functions.h"
+#include "Point2D.h"
 
 #include <functional>
 

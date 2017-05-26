@@ -29,9 +29,13 @@
 #ifndef EMP_GRID_H
 #define EMP_GRID_H
 
+#include <type_traits>
+
 #include "../base/assert.h"
 #include "../base/vector.h"
 #include "BitVector.h"
+
+#include "../meta/meta.h"
 
 namespace emp {
 namespace Grid {
@@ -86,9 +90,25 @@ namespace Grid {
     int GetHeight() const { return states.size() / width; }
     int GetSize() const { return states.size(); }
 
-    STATE_TYPE operator()(int x, int y) { return states[y*width+x]; }
-    STATE_TYPE operator()(int id) { return states[id]; }
-    STATE_TYPE operator[](int id) { return states[id]; }
+    STATE_TYPE& operator()(int x, int y) {
+        emp_assert(x >= 0 && x < width && "x coordinate out of range",x, width);
+        emp_assert(y >= 0 && y < GetHeight()
+                    && "y coordinate out of range", y, GetHeight());
+        return states[y*width+x];
+    }
+    STATE_TYPE& operator()(int id) { return states[id]; }
+    STATE_TYPE& operator[](int id) { return states[id]; }
+
+    STATE_TYPE operator()(int x, int y) const {
+    emp_assert(x >= 0 && x < width && "x coordinate out of range",x, width);
+    emp_assert(y >= 0 && y < GetHeight()
+                && "y coordinate out of range", y, GetHeight());
+        return states[y*width+x];
+    }
+    STATE_TYPE operator()(int id) const { return states[id]; }
+    STATE_TYPE operator[](int id) const { return states[id]; }
+
+
   };
 
   template <>
@@ -107,9 +127,25 @@ namespace Grid {
     int GetHeight() const { return states.size() / width; }
     int GetSize() const { return states.size(); }
 
-    bool operator()(int x, int y) { return states[y*width+x]; }
-    bool operator()(int id) { return states[id]; }
-    bool operator[](int id) { return states[id]; }
+    auto operator()(int x, int y) {
+        emp_assert(x >= 0 && x < width && "x coordinate out of range",x, width);
+        emp_assert(y >= 0 && y < GetHeight()
+                && "y coordinate out of range", y, GetHeight());
+        return states[y*width+x];
+    }
+    auto operator()(int id) { return states[id]; }
+    auto operator[](int id) { return states[id]; }
+
+    const bool operator()(int x, int y) const {
+        emp_assert(x >= 0 && x < width && "x coordinate out of range",x, width);
+        emp_assert(y >= 0 && y < GetHeight() 
+                && "y coordinate out of range", y, GetHeight());
+        return states[y*width+x];
+    }
+    const bool operator()(int id) const { return states[id]; }
+    const bool operator[](int id) const { return states[id]; }
+
+
   };
 
   // StateSet is specialized on void: no data is stored.
@@ -140,6 +176,7 @@ namespace Grid {
     StateSet<POINT_TYPE> point_states;  // States of points (where edges cross)
 
   public:
+
     Board(const Layout & in_layout)
       : layout(in_layout)
       , cell_states(layout.GetWidth(), layout.GetHeight())
@@ -161,67 +198,126 @@ namespace Grid {
     EDGE_TYPE GetEdgeVValue(int id) const { return edge_states_v[id]; }
     POINT_TYPE GetPointValue(int id) const { return point_states[id]; }
 
-    void SetCellValue(int id, CELL_TYPE value) { cell_states[id] = value; }
+    CELL_TYPE GetCellValue(int x, int y) const { return cell_states(x, y); }
+    EDGE_TYPE GetEdgeHValue(int x, int y) const { return edge_states_h(x, y); }
+    EDGE_TYPE GetEdgeVValue(int x, int y) const { return edge_states_v(x, y); }
+    POINT_TYPE GetPointValue(int x, int y) const { return point_states(x, y); }
+
+
+    // T is always going to be CELL_TYPE but we need to do it this way to use
+    // enable_if to avoid building these methods when CELL_TYPE is void
+    template <typename T>
+    typename std::enable_if<!std::is_void<T>::value, void>::type
+    SetCellValue(int id, T value) { cell_states[id] = value; }
+
+    template <typename T>
+    typename std::enable_if<std::is_void<T>::value, void>::type
+    SetCellValue(int id, T value) {
+        emp_assert(false &&
+        "Attempting to call SetCellValue but CELL_TYPE is void");
+    }
+
+    template <typename T>
+    typename std::enable_if<!std::is_void<T>::value, void>::type
+    SetCellValue(int x, int y, T value) { cell_states(x, y) = value; }
+
+    template <typename T>
+    typename std::enable_if<std::is_void<T>::value, void>::type
+    SetCellValue(int x, int y, T value) {
+        emp_assert(false &&
+        "Attempting to call SetCellValue but CELL_TYPE is void");
+    }
+
+
+    // T is always going to be POINT_TYPE but we need to do it this way to use
+    // enable_if to avoid building these methods when CELL_TYPE is void
+    template <typename T>
+    typename std::enable_if<!std::is_void<T>::value, void>::type
+    SetPointValue(int id, T value) { point_states[id] = value; }
+
+    template <typename T>
+    typename std::enable_if<std::is_void<T>::value, void>::type
+    SetPointValue(int id, T value) {
+        emp_assert(false &&
+        "Attempting to call SetPointValue but POINT_TYPE is void");
+    }
+
+    template <typename T>
+    typename std::enable_if<!std::is_void<T>::value, void>::type
+    SetPointValue(int x, int y, T value) { point_states(x, y) = value; }
+
+    template <typename T>
+    typename std::enable_if<std::is_void<T>::value, void>::type
+    SetPointValue(int x, int y, T value) {
+        emp_assert(false &&
+        "Attempting to call SetPointValue but POINT_TYPE is void");
+    }
+
+
     void SetEdgeHValue(int id, EDGE_TYPE value) { edge_states_h[id] = value; }
+    void SetEdgeHValue(int x, int y, EDGE_TYPE value) { edge_states_h(x, y) = value; }
+
     void SetEdgeVValue(int id, EDGE_TYPE value) { edge_states_v[id] = value; }
-    void SetPointValue(int id, POINT_TYPE value) { point_states[id] = value; }
+    void SetEdgeVValue(int x, int y, EDGE_TYPE value) { edge_states_v(x, y) = value; }
+
   };
 
-  template <typename CELL_TYPE>
-  class Cell {
-  private:
-    Board<CELL_TYPE> & board;
-    int id;
-  public:
-    Cell(Board &b, int in_id) : board(b), id(in_id) { ; }
-    Cell(const Cell &) = default;
-    Cell & operator=(const Cell &) = default;
 
-    CELL_TYPE GetValue() const { return board.GetCellValue(id); }
-    void SetValue(CELL_TYPE value) { board.SetCellValue(id, value); }
-  };
-
-  template <typename EDGE_TYPE>
-  class VEdge {
-  private:
-    Board & board;
-    int id;
-  public:
-    VEdge(Board & b, int in_id) : board(b), id(in_id) { ; }
-    VEdge(const VEdge &) = default;
-    VEdge & operator=(const VEdge &) = default;
-
-    EDGE_TYPE GetValue() const { return board.GetEdgeVValue(id); }
-    void SetValue(EDGE_TYPE value) { board.SetEdgeVValue(id, value); }
-  };
-
-  template <typename EDGE_TYPE>
-  class HEdge {
-  private:
-    Board & board;
-    int id;
-  public:
-    HEdge(Board & b, int in_id) : board(b), id(in_id) { ; }
-    HEdge(const HEdge &) = default;
-    HEdge & operator=(const HEdge &) = default;
-
-    EDGE_TYPE GetValue() const { return board.GetEdgeHValue(id); }
-    void SetValue(EDGE_TYPE value) { board.SetEdgeHValue(id, value); }
-  };
-
-  template <typename POINT_TYPE>
-  class Point {
-  private:
-    Board & board;
-    int id;
-  public:
-    Point(Board & b, int in_id) : board(b), id(in_id) { ; }
-    Point(const Point &) = default;
-    Point & operator=(const Pointe &) = default;
-
-    POINT_TYPE GetValue() const { return board.GetPointValue(id); }
-    void SetValue(POINT_TYPE value) { board.SetPointValue(id, value); }
-  };
+  // template <typename CELL_TYPE>
+  // class Cell {
+  // private:
+  //   Board<CELL_TYPE> & board;
+  //   int id;
+  // public:
+  //   Cell(Board<CELL_TYPE> &b, int in_id) : board(b), id(in_id) { ; }
+  //   Cell(const Cell &) = default;
+  //   Cell & operator=(const Cell &) = default;
+  //
+  //   CELL_TYPE GetValue() const { return board.GetCellValue(id); }
+  //   void SetValue(CELL_TYPE value) { board.SetCellValue(id, value); }
+  // };
+  //
+  // template <typename EDGE_TYPE>
+  // class VEdge {
+  // private:
+  //   Board<EDGE_TYPE> & board;
+  //   int id;
+  // public:
+  //   VEdge(Board<EDGE_TYPE> & b, int in_id) : board(b), id(in_id) { ; }
+  //   VEdge(const VEdge &) = default;
+  //   VEdge & operator=(const VEdge &) = default;
+  //
+  //   EDGE_TYPE GetValue() const { return board.GetEdgeVValue(id); }
+  //   void SetValue(EDGE_TYPE value) { board.SetEdgeVValue(id, value); }
+  // };
+  //
+  // template <typename EDGE_TYPE>
+  // class HEdge {
+  // private:
+  //   Board<EDGE_TYPE> & board;
+  //   int id;
+  // public:
+  //   HEdge(Board<EDGE_TYPE> & b, int in_id) : board(b), id(in_id) { ; }
+  //   HEdge(const HEdge &) = default;
+  //   HEdge & operator=(const HEdge &) = default;
+  //
+  //   EDGE_TYPE GetValue() const { return board.GetEdgeHValue(id); }
+  //   void SetValue(EDGE_TYPE value) { board.SetEdgeHValue(id, value); }
+  // };
+  //
+  // template <typename POINT_TYPE>
+  // class Point {
+  // private:
+  //   Board<POINT_TYPE> & board;
+  //   int id;
+  // public:
+  //   Point(Board<> & b, int in_id) : board(b), id(in_id) { ; }
+  //   Point(const Point &) = default;
+  //   Point & operator=(const Point &) = default;
+  //
+  //   POINT_TYPE GetValue() const { return board.GetPointValue(id); }
+  //   void SetValue(POINT_TYPE value) { board.SetPointValue(id, value); }
+  // };
 
 }
 }

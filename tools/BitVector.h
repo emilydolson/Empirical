@@ -247,7 +247,7 @@ namespace emp {
     }
 
     void Set(size_t index, bool value) {
-      emp_assert(index >= 0 && index < num_bits);
+      emp_assert(index >= 0 && index < num_bits, index, num_bits);
       const size_t field_id = FieldID(index);
       const size_t pos_id = FieldPos(index);
       const field_t pos_mask = static_cast<field_t>(1) << pos_id;
