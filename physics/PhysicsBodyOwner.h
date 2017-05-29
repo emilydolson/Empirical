@@ -14,21 +14,25 @@ namespace emp {
   template<typename BODY_TYPE>
   class PhysicsBodyOwner_Base {
   protected:
-    BODY_TYPE *body;
-    bool has_body;
+    BODY_TYPE *body = nullptr;
+    bool has_body = false;
     // DISCUSS: @amlalejini: I don't like that body_cleanup flag is necessary. Can we design this out?
-    bool body_cleanup; // Is this object responsible for body cleanup (deletion)?
+    bool body_cleanup = true; // Is this object responsible for body cleanup (deletion)?
+
+  public:
+
+    using Body_t = BODY_TYPE;
 
     PhysicsBodyOwner_Base() : body_cleanup(true) { ; }
 
-  public:
     virtual ~PhysicsBodyOwner_Base() {
       if (has_body && body_cleanup) {
-        delete body;
-        DetachBody();
+        emp_assert(body != nullptr);
+        // delete body;
+        // DetachBody();
       } else if (has_body && !body_cleanup) {
-        body->FlagForDestruction();
-        DetachBody();
+        // body->FlagForDestruction();
+        // DetachBody();
       }
     }
 
@@ -44,18 +48,19 @@ namespace emp {
       has_body = true;
     }
     virtual void DetachBody() {
-      if (has_body) body->DetachTrackedOwner();
+    //   if (has_body) body->DetachTrackedOwner();
       body = nullptr;
       has_body = false;
     }
     virtual void Evaluate() {
       if (has_body) {
-        if (body->GetDestroyFlag() && body_cleanup) {
-          delete body;
-          DetachBody();
-        } else if (body->GetDestroyFlag() && !body_cleanup) {
-          DetachBody();
-        }
+        // if (body->GetDestroyFlag() && body_cleanup) {
+        //   emp_assert(body != nullptr);
+        //   delete body;
+        //   DetachBody();
+        // } else if (body->GetDestroyFlag() && !body_cleanup) {
+        //   DetachBody();
+        // }
       }
     }
   };

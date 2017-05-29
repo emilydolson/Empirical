@@ -24,7 +24,7 @@ CFLAGS_web := $(CFLAGS_all) $(OFLAGS_web) --js-library ../../web/library_emp.js 
 
 TARGETS := Ecocase EcoEA Fitness_Share_NK Grid Lexicase link_test MultiNK NK NK-constexpr NK-const-config NK-Serial Roulette StateGrid Symbulation World bit_evolve Maze
 
-JS_TARGETS := LineageViz.js
+JS_TARGETS := LineageViz.js Maze.js
 
 EVO_DEPEND := ../../evo/PopulationManager.h ../../evo/World.h
 

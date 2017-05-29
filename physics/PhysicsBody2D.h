@@ -232,10 +232,10 @@ namespace emp {
     using Shape_t = SHAPE_TYPE;
     using Owner_t = PhysicsBodyOwner_Base<PhysicsBody2D<Shape_t>>;
 
-    Shape_t * shape_ptr;
-    TrackedType * tracked_owner;
-    Owner_t *body_owner;
-    bool has_owner;
+    Shape_t * shape_ptr = nullptr;
+    TrackedType * tracked_owner = nullptr;
+    Owner_t *body_owner = nullptr;
+    bool has_owner = false;
 
 
   public:
@@ -244,10 +244,12 @@ namespace emp {
       shape_ptr = new Shape_t(std::forward<ARGS>(args)...);
     }
     ~PhysicsBody2D() {
-      delete shape_ptr;
+      if (shape_ptr) {
+        //   delete shape_ptr;
+      }
       // TODO: we need to tell owner (if we have an owner) that we've deleted this body.
       //      * Currently not a huge fan of this way of doing it.
-      if (has_owner) body_owner->DetachBody();
+    //   if (has_owner) body_owner->DetachBody();
     }
 
     Shape_t * GetShapePtr() override { return shape_ptr; }
@@ -267,7 +269,7 @@ namespace emp {
       has_owner = true;
     }
     void AttachTrackedOwner(TrackedType *ptr, Owner_t *o_ptr) {
-      emp_assert(ptr != nullptr && has_owner != true);
+      emp_assert(ptr != nullptr && has_owner != true, ptr, has_owner);
       tracked_owner = ptr;
       body_owner = o_ptr;
       has_owner = true;

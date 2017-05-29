@@ -92,8 +92,8 @@ namespace emp {
 
     TYPE Distance(const Point2D & _in) const { return sqrt( SquareDistance(_in) ); }
 
-    TYPE XDistance(const Point2D & _in) const { return abs(x - _in.x); }
-    TYPE YDistance(const Point2D & _in) const { return abs(y - _in.y); }
+    TYPE XDistance(const Point2D & _in) const { return std::abs(x - _in.x); }
+    TYPE YDistance(const Point2D & _in) const { return std::abs(y - _in.y); }
   };
 
   using Point = Point2D<>;
