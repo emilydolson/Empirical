@@ -158,6 +158,14 @@ namespace web {
       Info()->AddAction( new CanvasLine(x1, y1, x2, y2, lc) );
       return *this;
     }
+    Canvas & Line(emp::Line line, const std::string & lc="") {
+      Info()->AddAction( new CanvasLine(line.GetP1().GetX(),
+                                        line.GetP1().GetY(),
+                                        line.GetP2().GetX(),
+                                        line.GetP2().GetY(), lc) );
+      return *this;
+    }
+
     Canvas & Text(double x, double y, const std::string text,
                   const std::string & fc="", const std::string & lc="") {
       Info()->AddAction( new CanvasText(x, y, text, fc, lc) );
@@ -183,6 +191,14 @@ namespace web {
     Canvas & Draw(const emp::Rect & rect,
                   const std::string & fc="", const std::string & lc="") {
       Info()->AddAction( new CanvasRect(rect.GetULX(), rect.GetULY(), rect.GetWidth(), rect.GetHeight(), fc, lc) );
+      return *this;
+    }
+    Canvas & Draw(const emp::Line & line,
+                  const std::string & lc="") {
+      Info()->AddAction( new CanvasLine(line.GetP1().GetX(),
+                                        line.GetP1().GetY(),
+                                        line.GetP2().GetX(),
+                                        line.GetP2().GetY(), lc) );
       return *this;
     }
     Canvas & Draw(const CanvasShape & shape) {

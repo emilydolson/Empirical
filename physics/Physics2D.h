@@ -332,9 +332,10 @@ namespace emp {
         using body_owner_tracker_t = TypeTracker<BODY_OWNERS*...>;
         using CollisionResolutionFunction_t = std::function<void(Body_t *, Body_t *)>;
 
-        body_tracker_t body_tt;
+
         body_owner_tracker_t body_owner_tt;
         CollisionResolutionFunction_t CollisionResolutionFunction;
+        // using body_types_t = struct {using test_t = emp::TypePack<>;};
         emp::vector<Body_t*> body_set;
         using CirclePhysics2D<BODY_OWNERS...>::max_pos;
         using CirclePhysics2D<BODY_OWNERS...>::max_radius;
@@ -343,7 +344,138 @@ namespace emp {
         using CirclePhysics2D<BODY_OWNERS...>::random_ptr;
         using CirclePhysics2D<BODY_OWNERS...>::on_update_signal;
 
-        using CirclePhysics2D<BODY_OWNERS...>::UpdateBodies;
+        void UpdateBodies() {
+          int cur_size = (int) body_set.size();
+          int cur_id = 0;
+          while (cur_id < cur_size) {
+            // Has this body been flagged for removal?
+            // TODO: check to make sure physics is still managing this body?
+            if (GetDestroyFlag(body_set[cur_id])) {
+              delete body_set[cur_id];
+              --cur_size;
+              body_set[cur_id] = body_set[cur_size];
+              continue;
+            // No body to be removed,
+            } else {
+              // Run a body update.
+              Update(body_set[cur_id]);
+              // Update max radius.
+              if (GetRadius(body_set[cur_id]) > max_radius)
+                max_radius = GetRadius(body_set[cur_id]);
+              ++cur_id;
+            }
+          }
+          body_set.resize(cur_size);
+        }
+
+        double GetRadius(emp::TrackedType * body) {
+            if (body_tt.IsType<PhysicsBody2D<Rect>*>(*body)) {
+                return body_tt.ToType<PhysicsBody2D<Rect>*>(*body)->GetShape().GetRadius();
+            } else {
+                return body_tt.ToType<PhysicsBody2D<Circle>*>(*body)->GetShape().GetRadius();
+            }
+        }
+
+        void Update(emp::TrackedType * body) {
+            if (body_tt.IsType<PhysicsBody2D<Rect>*>(*body)) {
+                body_tt.ToType<PhysicsBody2D<Rect>*>(*body)->Update(friction);
+            } else {
+                body_tt.ToType<PhysicsBody2D<Circle>*>(*body)->Update(friction);
+            }
+        }
+
+        bool GetDestroyFlag(emp::TrackedType * body) {
+            if (body_tt.IsType<PhysicsBody2D<Rect>*>(*body)) {
+                return body_tt.ToType<PhysicsBody2D<Rect>*>(*body)->GetDestroyFlag();
+            } else {
+                return body_tt.ToType<PhysicsBody2D<Circle>*>(*body)->GetDestroyFlag();
+            }
+        }
+
+        bool IsImmobile(emp::TrackedType * body) {
+            if (body_tt.IsType<PhysicsBody2D<Rect>*>(*body)) {
+                return body_tt.ToType<PhysicsBody2D<Rect>*>(*body)->IsImmobile();
+            } else {
+                return body_tt.ToType<PhysicsBody2D<Circle>*>(*body)->IsImmobile();
+            }
+        }
+
+        bool IsColliding(emp::TrackedType * body) {
+            if (body_tt.IsType<PhysicsBody2D<Rect>*>(*body)) {
+                return body_tt.ToType<PhysicsBody2D<Rect>*>(*body)->IsColliding();
+            } else {
+                return body_tt.ToType<PhysicsBody2D<Circle>*>(*body)->IsColliding();
+            }
+        }
+
+        emp::Point GetAnchor(emp::TrackedType * body) {
+            if (body_tt.IsType<PhysicsBody2D<Rect>*>(*body)) {
+                return body_tt.ToType<PhysicsBody2D<Rect>*>(*body)->GetAnchor();
+            } else {
+                return body_tt.ToType<PhysicsBody2D<Circle>*>(*body)->GetAnchor();
+            }
+        }
+
+        emp::TrackedType* GetTrackedOwnerPtr(emp::TrackedType * body) {
+            if (body_tt.IsType<PhysicsBody2D<Rect>*>(*body)) {
+                return body_tt.ToType<PhysicsBody2D<Rect>*>(*body)->GetTrackedOwnerPtr();
+            } else {
+                return body_tt.ToType<PhysicsBody2D<Circle>*>(*body)->GetTrackedOwnerPtr();
+            }
+        }
+
+
+        bool HasOverlap(emp::TrackedType * body1, emp::TrackedType * body2) {
+            if (body_tt.IsType<PhysicsBody2D<Rect>*>(*body1)) {
+                if (body_tt.IsType<PhysicsBody2D<Rect>*>(*body2)) {
+                    return body_tt.ToType<PhysicsBody2D<Rect>*>(*body1)->GetShape().HasOverlap(body_tt.ToType<PhysicsBody2D<Rect>*>(*body2)->GetShape());
+                } else {
+                    return body_tt.ToType<PhysicsBody2D<Rect>*>(*body1)->GetShape().HasOverlap(body_tt.ToType<PhysicsBody2D<Circle>*>(*body2)->GetShape());
+                }
+            } else {
+                if (body_tt.IsType<PhysicsBody2D<Rect>*>(*body2)) {
+                    return body_tt.ToType<PhysicsBody2D<Circle>*>(*body1)->GetShape().HasOverlap(body_tt.ToType<PhysicsBody2D<Rect>*>(*body2)->GetShape());
+                } else {
+                    return body_tt.ToType<PhysicsBody2D<Circle>*>(*body1)->GetShape().HasOverlap(body_tt.ToType<PhysicsBody2D<Circle>*>(*body2)->GetShape());
+                }
+
+            }
+        }
+
+        bool IsLinked(emp::TrackedType * body1, emp::TrackedType * body2) {
+            if (body_tt.IsType<PhysicsBody2D<Rect>*>(*body1)) {
+                if (body_tt.IsType<PhysicsBody2D<Rect>*>(*body2)) {
+                    return body_tt.ToType<PhysicsBody2D<Rect>*>(*body1)->IsLinked(*body_tt.ToType<PhysicsBody2D<Rect>*>(*body2));
+                } else {
+                    return body_tt.ToType<PhysicsBody2D<Rect>*>(*body1)->IsLinked(*body_tt.ToType<PhysicsBody2D<Circle>*>(*body2));
+                }
+            } else {
+                if (body_tt.IsType<PhysicsBody2D<Rect>*>(*body2)) {
+                    return body_tt.ToType<PhysicsBody2D<Circle>*>(*body1)->IsLinked(*body_tt.ToType<PhysicsBody2D<Rect>*>(*body2));
+                } else {
+                    return body_tt.ToType<PhysicsBody2D<Circle>*>(*body1)->IsLinked(*body_tt.ToType<PhysicsBody2D<Circle>*>(*body2));
+                }
+
+            }
+        }
+
+        void TriggerCollision(emp::TrackedType * body1, emp::TrackedType * body2) {
+            if (body_tt.IsType<PhysicsBody2D<Rect>*>(*body1)) {
+                if (body_tt.IsType<PhysicsBody2D<Rect>*>(*body2)) {
+                    body_tt.ToType<PhysicsBody2D<Rect>*>(*body1)->TriggerCollision(body_tt.ToType<PhysicsBody2D<Rect>*>(*body2));
+                } else {
+                    body_tt.ToType<PhysicsBody2D<Rect>*>(*body1)->TriggerCollision(body_tt.ToType<PhysicsBody2D<Circle>*>(*body2));
+                }
+            } else {
+                if (body_tt.IsType<PhysicsBody2D<Rect>*>(*body2)) {
+                    body_tt.ToType<PhysicsBody2D<Circle>*>(*body1)->TriggerCollision(body_tt.ToType<PhysicsBody2D<Rect>*>(*body2));
+                } else {
+                    body_tt.ToType<PhysicsBody2D<Circle>*>(*body1)->TriggerCollision(body_tt.ToType<PhysicsBody2D<Circle>*>(*body2));
+                }
+
+            }
+        }
+
 
         void TestCollisions() {
           // Test for collisions among bodies by dividing world into sectors.
@@ -358,27 +490,26 @@ namespace emp {
           const double sector_width = GetWidth() / (double) num_cols;
           const double sector_height = GetHeight() / (double) num_rows;
           vector<vector<Body_t*>> sector_set(num_sectors);
-          for (auto *tt_body : body_set) {
-            auto body = body_tt.ToType(tt_body);
-            emp_assert(body != nullptr);
+          for (int b=0; b < body_set.size(); b++) {
+            // emp_assert(body_tt.ToType(tt_body) != nullptr);
             // Determine which sector the current body is in.
-            const int cur_col = MakeRange(0, max_col).Valid(body->GetAnchor().GetX()/sector_width);
-            const int cur_row = MakeRange(0, max_row).Valid(body->GetAnchor().GetY()/sector_height);
+            const int cur_col = MakeRange(0, max_col).Valid(GetAnchor(body_set[b]).GetX()/sector_width);
+            const int cur_row = MakeRange(0, max_row).Valid(GetAnchor(body_set[b]).GetY()/sector_height);
             // See if this body may collide with any of the bodies in this sector and in adjacent sectors.
             for (int k = std::max(0, cur_col-1); k <= std::min(cur_col+1, max_col); k++) {
               for (int j = std::max(0, cur_row-1); j <= std::min(cur_row+1, max_row); j++) {
                 const int sector_id = k + num_cols * j;
                 if (sector_set[sector_id].size() == 0) continue; // Nothing in current sector.
                 for (int i = 0; i < sector_set[sector_id].size(); i++) {
-                    auto body2 = body_tt.ToType(sector_set[sector_id][i]);
-                    CollideBodies(body, body2);
+                    if (IsImmobile(body_set[b]) && IsImmobile(sector_set[sector_id][i])) {continue;}
+                    CollideBodies(body_set[b], sector_set[sector_id][i]);
                 }
               }
             }
             // Add current body to the appropriate sector.
             const int cur_sector = cur_col + cur_row * num_cols;
             emp_assert(cur_sector < (int) sector_set.size());
-            sector_set[cur_sector].push_back(body);
+            sector_set[cur_sector].push_back(body_set[b]);
           }
         }
 
@@ -388,23 +519,22 @@ namespace emp {
           // @amlalejini: Do we want links to imply no collision going forward? Maximal flexibility
           //   on collision resolution seems best. Some types of links might want to collide?
           // If bodies are linked, no collision.
-          if (body_tt.ToType(body1)->IsLinked(*body2)) return false;
+          if (IsLinked(body1, body2)) {return false;}
+          if (IsLinked(body2, body1)) {return false;}
+
+
           // First: Body-touching math.
-          Point dist = body_tt.ToType(body1)->GetShape().GetCenter() - body_tt.ToType(body2)->GetShape().GetCenter();
-          const double sq_pair_dist = dist.SquareMagnitude();
-          const double radius_sum = body_tt.ToType(body1)->GetShape().GetRadius() + body_tt.ToType(body2)->GetShape().GetRadius();
-          const double sq_min_dist = radius_sum * radius_sum;
           // No touching, no collision.
-          if (sq_pair_dist >= sq_min_dist) return false;
+          if (!HasOverlap(body1, body2)) return false;
           // Must be touching, collision!
-          body_tt.ToType(body1)->TriggerCollision(body2);   // Give bodies opportunity to respond to the collision.
-          body_tt.ToType(body2)->TriggerCollision(body1);
+          TriggerCollision(body1, body2);   // Give bodies opportunity to respond to the collision.
+          TriggerCollision(body2, body1);
           // Give owners opportunity to respond to collision. TODO: what if no owners?
-          if (body_tt.ToType(body1)->IsColliding() || body_tt.ToType(body2)->IsColliding())
-            body_owner_tt.RunFunction(body_tt.ToType(body1)->GetTrackedOwnerPtr(), body_tt.ToType(body2)->GetTrackedOwnerPtr());
+        //   if (IsColliding(body1) || IsColliding(body2))
+        //     body_owner_tt.RunFunction(GetTrackedOwnerPtr(body1), GetTrackedOwnerPtr(body2));
           // If collision is not resolved yet, fall back to default behavior.
-          if (body_tt.ToType(body1)->IsColliding() || body_tt.ToType(body2)->IsColliding())
-            this->CollisionResolutionFunction(body_tt.ToType(body1), body_tt.ToType(body2));
+          if (IsColliding(body1) || IsColliding(body2))
+            this->CollisionResolutionFunction(body1, body2);
           return true;
         }
 
@@ -412,6 +542,7 @@ namespace emp {
         using CirclePhysics2D<BODY_OWNERS...>::FinalizeBodies;
 
       public:
+        body_tracker_t body_tt;
         MixedPhysics2D(): CirclePhysics2D<BODY_OWNERS...>() {
           emp_assert(sizeof...(BODY_OWNERS) > 0); // (TODO:? @amlalejini: should we allow for bodies with no owners?)
         }
@@ -424,15 +555,44 @@ namespace emp {
 
         ~MixedPhysics2D() {;}
 
-        using CirclePhysics2D<BODY_OWNERS...>::GetTypeID;
-        using CirclePhysics2D<BODY_OWNERS...>::IsBodyOwnerType;
-        using CirclePhysics2D<BODY_OWNERS...>::ToBodyOwnerType;
-        using CirclePhysics2D<BODY_OWNERS...>::Clear;
+        template<typename T>
+        constexpr static int GetTypeID() { return get_type_index<T, BODY_OWNERS...>(); }
+        // Call GetTypeID(owner) to get the ID associated with 'owner'.
+        template <typename T>
+        constexpr static int GetTypeID(const T &) { return get_type_index<T, BODY_OWNERS...>(); }
+        // Given a body and a BODY_OWNER type, is the body's owner of type BODY_OWNER?
+        template <typename BODY_OWNER>
+        bool IsBodyOwnerType(Body_t *body) {
+          return body_owner_tt.template IsType<BODY_OWNER*>(*(body_tt.ToType(body)->GetTrackedOwnerPtr()));
+        }
+        // Cast body to type BODY_OWNER.
+        template <typename BODY_OWNER>
+        BODY_OWNER * ToBodyOwnerType(Body_t *body) {
+          return body_owner_tt.template ToType<BODY_OWNER*>(*(body_tt.ToType(body)->GetTrackedOwnerPtr()));
+        }
 
-        using CirclePhysics2D<BODY_OWNERS...>::GetHeight;
-        using CirclePhysics2D<BODY_OWNERS...>::GetWidth;
-        using CirclePhysics2D<BODY_OWNERS...>::GetBodySet;
-        using CirclePhysics2D<BODY_OWNERS...>::GetConstBodySet;
+        auto ToBodyType(Body_t *body) {
+            if (body_tt.IsType<PhysicsBody2D<Rect>*>(body)) {
+                return body_tt.ToType<PhysicsBody2D<Rect>*>(body);
+            } else {
+                return body_tt.ToType<PhysicsBody2D<Circle>*>(body);
+            }
+        }
+
+        MixedPhysics2D & Clear() {
+          // @amlalejini: For now, physics is responsible for deleting bodies managed by physics.
+          for (auto * body : body_set) {
+            delete body;
+          }
+          body_set.resize(0);
+          return *this;
+        }
+
+        double GetWidth() const { emp_assert(configured); return max_pos->GetX(); }
+        double GetHeight() const { emp_assert(configured); return max_pos->GetY(); }
+        emp::vector<Body_t*> & GetBodySet() { return body_set; }
+        const emp::vector<Body_t*> & GetConstBodySet() const { return body_set; }
+
         using CirclePhysics2D<BODY_OWNERS...>::ConfigPhysics;
 
         template <typename OWNER_TYPE>
@@ -446,7 +606,7 @@ namespace emp {
           // TODO: make this less gross.
         //   body_owner->GetBodyPtr()->AttachTrackedOwner(body_owner_tt.template New<OWNER_TYPE*>(body_owner), body_owner);
 
-          Body_t * body_ptr = body_tt.New<typename OWNER_TYPE::Body_t* >(body_owner->GetBodyPtr());
+          Body_t * body_ptr = body_tt.template New<typename OWNER_TYPE::Body_t*>(body_owner->GetBodyPtr());
           body_set.push_back(body_ptr);
           return *this;
         }
@@ -466,9 +626,129 @@ namespace emp {
         }
 
         using CirclePhysics2D<BODY_OWNERS...>::RegisterOnUpdateCallback;
-        using CirclePhysics2D<BODY_OWNERS...>::RegisterCollisionHandler;
-        using CirclePhysics2D<BODY_OWNERS...>::SetDefaultCollisionResolutionFunction;
-        using CirclePhysics2D<BODY_OWNERS...>::Update;
+        // Handler registration.
+        template <typename T1, typename T2>
+        void RegisterCollisionHandler(std::function<void(T1*, T2*)> fun) {
+          emp_assert(GetTypeID<T1>() >= 0 && GetTypeID<T2>() >= 0);
+          body_owner_tt.AddFunction(fun);
+          // If types are not the same, register same function but with diff arg ordering.
+          if (GetTypeID<T1>() != GetTypeID<T2>()) {
+            std::function<void(T2*, T1*)> f2 = [fun](T2 *t2, T1 *t1) { fun(t1, t2); };
+            body_owner_tt.AddFunction(f2);
+          }
+        }
+
+        // Allow setting of default collision resolution function.
+        void SetDefaultCollisionResolutionFunction(CollisionResolutionFunction_t fun) {
+          CollisionResolutionFunction = fun;
+        }
+
+        void Deflect(PhysicsBody2D<Circle> * circ, PhysicsBody2D<Rect> * rect) {
+          // TODO: @amlalejini: This math is redundant. Could have a collision info struct that gets passed around.
+
+          Point curr_velocity = circ->GetVelocity();
+          Point prev_center = circ->GetShape().GetCenter() - curr_velocity;
+
+          if ((prev_center.GetX() + circ->GetShape().GetRadius() < rect->GetShape().GetULX()) ||
+              (prev_center.GetX() - circ->GetShape().GetRadius() > rect->GetShape().GetLRX())) {
+              circ->SetVelocity(curr_velocity.GetX()*-1, curr_velocity.GetY());
+              circ->GetShape().Translate(Point(curr_velocity.GetX()*-1,0));
+          } else {
+              circ->SetVelocity(curr_velocity.GetX(), curr_velocity.GetY()*-1);
+              circ->GetShape().Translate(Point(0,curr_velocity.GetY()*-1));
+          }
+
+        //   double xdist = circ->GetShape().GetCenterX() - rect->GetShape().GetCenterX();
+        //   double ydist = circ->GetShape().GetCenterY() - rect->GetShape().GetCenterY();
+          //
+        //   double xoverlap, yoverlap;
+          //
+        //   if (xdist > 0) {
+        //       // circle is farther right than rect
+        //       xoverlap = -1*std::min(0.0, circ->GetShape().GetCenterX() - circ->GetShape().GetRadius() - rect->GetShape().GetLRX());
+        //   } else {
+        //       // circle is farther left than rect
+        //       xoverlap = -1*std::min(0.0, rect->GetShape().GetULX() - (circ->GetShape().GetCenterX() + circ->GetShape().GetRadius()));
+        //   }
+          //
+        //   if (ydist > 0) {
+        //       // circle is farther down than rect
+        //       yoverlap = -1*std::min(0.0, circ->GetShape().GetCenterY() - circ->GetShape().GetRadius() - rect->GetShape().GetLRY());
+        //   } else {
+        //       // circle is farther up than rect
+        //       yoverlap = -1*std::min(0.0, rect->GetShape().GetULY() - (circ->GetShape().GetCenterY() + circ->GetShape().GetRadius()));
+        //   }
+          //
+          //
+        //   if (xoverlap/rect->GetShape().GetWidth() >= yoverlap/rect->GetShape().GetHeight()) {
+        //
+        //       if (xdist < 0) {
+        //           xoverlap *= -1;
+        //       }
+        //       circ->GetShape().Translate(Point(xoverlap, 0));
+        //   } else {
+        //       circ->SetVelocity(curr_velocity.GetX(), curr_velocity.GetY()*-1);
+        //       if (ydist < 0) {
+        //           yoverlap *= -1;
+        //       }
+        //       circ->GetShape().Translate(Point(0, yoverlap));
+        //   }
+          //
+
+
+
+        //   Point dist = body1->GetShape().GetCenter() - body2->GetShape().GetCenter();
+        //   double sq_pair_dist = dist.SquareMagnitude();
+        //   const double radius_sum = body1->GetShape().GetRadius() + body2->GetShape().GetRadius();
+        //   const double sq_min_dist = radius_sum * radius_sum;
+        //   // If bodies are directly (and centered) on top of one another, shift one such that they are no longer on top of each other.
+        //   if (sq_pair_dist == 0.0) {
+        //     body2->GetShape().Translate(Point(0.01, 0.01));
+        //     dist = body1->GetShape().GetCenter() - body2->GetShape().GetCenter();
+        //     sq_pair_dist = dist.SquareMagnitude();
+        //   }
+        //   // Re-adjust position to remove overlap.
+        //   const double true_dist = sqrt(sq_pair_dist);
+        //   const double overlap_dist = ((double)radius_sum) - true_dist;
+        //   const double overlap_frac = overlap_dist / true_dist;
+        //   const Point cur_shift = dist * (overlap_frac);
+        //   body1->AddShift(cur_shift);
+        //   // Resolve collision using impulse resolution.
+        //   const double coeff_of_restitution = 1.0;
+        //   const Point collision_normal(dist / true_dist);
+        //   const Point rel_velocity(body1->GetVelocity() - body2->GetVelocity());
+        //   const double velocity_along_normal = (rel_velocity.GetX() * collision_normal.GetX())
+        //                                      + (rel_velocity.GetY() * collision_normal.GetY());
+        //   // If velocities are separating, we can go ahead and resolve the collision.
+        //   if (velocity_along_normal > 0) {
+        //     body1->ResolveCollision(); body2->ResolveCollision();
+        //     return;
+        //   }
+        //   double j = -(1 + coeff_of_restitution) * velocity_along_normal; // Calculate j, the impulse scalar.
+        //   j /= body1->GetInvMass() + body2->GetInvMass();
+        //   const Point impulse(collision_normal * j);
+        //   // Apply the impulse.
+        //   body1->SetVelocity(body1->GetVelocity() + (impulse * body1->GetInvMass()));
+        //
+        //   // Mark collision as resolved.
+        //   body1->ResolveCollision(); body2->ResolveCollision();
+        }
+
+        // Progress physics by a single time step.
+        // TODO: @amlalejini: For on update signals, do we want multiple types of signals
+        //        -- pre update bodies, post update bodies/pre collision detection, post collision detection?
+        void Update() {
+          emp_assert(configured);
+          on_update_signal.Trigger();
+          // Update bodies.
+          //  -- Advance physics body motions by 1 timestep, remove bodies flagged for destruction, update max radius.
+          max_radius = 0;
+          UpdateBodies();
+          // Test for collisions, resolving any found.
+          if (max_radius > 0.0) TestCollisions();
+          // Finalize bodies for this update (cleanup).
+          FinalizeBodies();
+        }
 
 
   };

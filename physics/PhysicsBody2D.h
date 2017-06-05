@@ -71,7 +71,7 @@ namespace emp {
     double max_pressure;
     bool destroy; // Has this body been flagged for destruction?
     bool is_immobile;
-    bool is_colliding;
+    bool is_colliding = false;
     // Useful internal member variables:
     Point shift;            // How should this body be updated to minimize overlap?
     Point cum_shift;        // Build up of shift not yet acted upon.

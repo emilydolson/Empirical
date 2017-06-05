@@ -14,7 +14,12 @@
 #include "Shape2D.h"
 #include "Point2D.h"
 
+#include "../base/assert.h"
+
 namespace emp {
+
+  template <typename T>
+  class Rect2D;
 
   template <typename TYPE=double> class Circle2D : public Shape2D {
   private:
@@ -55,6 +60,23 @@ namespace emp {
       const TYPE min_dist = radius + other.radius;
       return center.SquareDistance(other.center) < (min_dist * min_dist);
     }
+    bool HasOverlap(const Rect2D<TYPE> & other) const {
+        if (other.GetULX() + other.GetWidth() == other.GetLRX()) {
+            // Rect is not rotated
+            // I'm worried that there's a literal corner case this is missing
+            // std::cout << GetCenterX() + GetRadius() << " " << other.GetULX()
+            // << " | " << GetCenterX() - GetRadius() << " " << other.GetLRX()
+            // << " | " << GetCenterY() + GetRadius() << " " << other.GetULY() << std::endl;
+            return (GetCenterX() + GetRadius() > other.GetULX() &&
+                   GetCenterX() - GetRadius() < other.GetLRX()) &&
+                   (GetCenterY() + GetRadius() > other.GetULY() &&
+                   GetCenterY() - GetRadius() < other.GetLRY());
+        }
+        emp_assert(false, "NOT IMPLEMENTED");
+        return false;
+    }
+
+
   };
 
   using Circle = Circle2D<double>;

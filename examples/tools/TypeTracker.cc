@@ -27,6 +27,11 @@ int main()
 {
   using tt_t = emp::TypeTracker<int, std::string, double>;
   tt_t tt;     // Build the tracker.
+
+  emp::TrackedType * test = tt.New<int>(14);
+  std::function<int(int)> echo = [](int i){std::cout << "i is: " << i << std::endl;return i;};
+  std::cout << "Run Function? " << tt.RunFunction(echo, test) << std::endl;
+
   tt.AddFunction(fun_int_int);                       // Add the functions...
   tt.AddFunction(fun_int_double);
   tt.AddFunction(fun_string_double);

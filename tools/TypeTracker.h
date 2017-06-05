@@ -57,7 +57,7 @@ namespace emp {
     using this_t = TypeTracker<TYPES...>;
     template <typename REAL_T>
     using wrap_t = TypeTracker_Class< REAL_T, get_type_index<REAL_T,TYPES...>() >;
-
+    int curr_method = 0;
     // How many types are we working with?
     constexpr static size_t GetNumTypes() { return sizeof...(TYPES); }
 
@@ -118,6 +118,9 @@ namespace emp {
 
     // fun_map is a hash table that maps a set of inputs to the appropriate function.
     std::unordered_map<size_t, emp::GenericFunction *> fun_map;
+
+    // fun_map is a hash table that maps a set of inputs to the appropriate function.
+    std::unordered_map<size_t, emp::GenericFunction *> method_map;
 
     // Constructors!
     TypeTracker() : fun_map() { ; }
@@ -188,6 +191,28 @@ namespace emp {
       return *this;
     }
 
+    // template <typename RET_T, typename T>
+    // this_t & AddFunction( std::function<RET_T(std::function<RET_T(T)>, T)> fun ) {
+    //   constexpr size_t ID = GetComboID<Ts...>();
+    //
+    //   // We need to ensure there are the same number of TrackedType parameters in the wrapped
+    //   // function as there were typed parameters in the original.  To accomplish this task, we
+    //   // will expand the original type pack, but use decoys to convert to TrackedType.
+    //
+    //   auto fun_wrap = [fun](std::function<RET_T(T)> fun, T arg) {
+    //     // Ensure all types can be cast appropriately
+    //     emp_assert( AllTrue( dynamic_cast<wrap_t<T> *>(arg)) );
+    //
+    //     // Now run the function with the correct type conversions
+    //     return fun( fun, ((wrap_t<T> *) arg)->value);
+    //   };
+    //
+    //   fun_map[ID] = new Function<std::function<RET_T(emp::type_decoy<TrackedType *,T>)>>(fun_wrap);
+    //
+    //   return *this;
+    // }
+
+
     template <typename... Ts>
     this_t & AddFunction( void (*fun)(Ts...) ) {
       return AddFunction( std::function<void(Ts...)>(fun) );
@@ -201,6 +226,35 @@ namespace emp {
         gfun->Call<void, emp::type_decoy<TrackedType *,Ts>...>(((emp::type_decoy<TrackedType *,Ts>) args)...);
       }
     }
+
+    template <typename RET_T, typename T>
+    RET_T RunFunction(std::function<RET_T(T)> func, TrackedType * tracked_obj ) {                 // args must all be TrackedType pointers!
+    //   int id = tracked_obj->GetTypeTrackerID();
+        auto fun_wrap = [func](emp::type_decoy<TrackedType *,T> args) {
+          // Ensure all types can be cast appropriately
+          emp_assert( AllTrue( dynamic_cast<wrap_t<T> *>(args)) );
+
+          // Now run the function with the correct type conversions
+          return func( ((wrap_t<T> *) args)->value);
+        };
+        emp::GenericFunction * new_fun = new emp::Function<RET_T(emp::type_decoy<TrackedType *,T>)>(fun_wrap);
+        return new_fun->Call<RET_T, emp::type_decoy<TrackedType *, T>>((emp::type_decoy<TrackedType *, int>)(tracked_obj));
+    }
+
+    template <typename T>
+    void RunFunction(std::function<void(T)> func, TrackedType * tracked_obj ) {                 // args must all be TrackedType pointers!
+    //   int id = tracked_obj->GetTypeTrackerID();
+        auto fun_wrap = [func](emp::type_decoy<TrackedType *,int> args) {
+          // Ensure all types can be cast appropriately
+          emp_assert( AllTrue( dynamic_cast<wrap_t<T> *>(args)) );
+
+          // Now run the function with the correct type conversions
+          return func( ((wrap_t<T> *) args)->value);
+        };
+        emp::GenericFunction * new_fun = new emp::Function<void(emp::type_decoy<TrackedType *,T>)>(fun_wrap);
+        new_fun->Call<void, emp::type_decoy<TrackedType *, int>>((emp::type_decoy<TrackedType *, int>)(tracked_obj));
+    }
+
 
     template <typename... Ts>
     void operator()(Ts... args) { RunFunction(args...); }
