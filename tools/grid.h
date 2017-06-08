@@ -140,7 +140,7 @@ namespace Grid {
 
     const bool operator()(int x, int y) const {
         emp_assert(x >= 0 && x < width && "x coordinate out of range",x, width);
-        emp_assert(y >= 0 && y < GetHeight() 
+        emp_assert(y >= 0 && y < GetHeight()
                 && "y coordinate out of range", y, GetHeight());
         return states[y*width+x];
     }
@@ -200,10 +200,42 @@ namespace Grid {
     EDGE_TYPE GetEdgeVValue(int id) const { return edge_states_v[id]; }
     POINT_TYPE GetPointValue(int id) const { return point_states[id]; }
 
-    CELL_TYPE GetCellValue(int x, int y) const { return cell_states(x, y); }
-    EDGE_TYPE GetEdgeHValue(int x, int y) const { return edge_states_h(x, y); }
-    EDGE_TYPE GetEdgeVValue(int x, int y) const { return edge_states_v(x, y); }
-    POINT_TYPE GetPointValue(int x, int y) const { return point_states(x, y); }
+    CELL_TYPE GetCellValue(int x, int y) const {
+        emp_assert(x >= 0 && x < cell_states.GetWidth()
+                                 && "x coordinate out of range",
+                                 x, cell_states.GetWidth());
+        emp_assert(y >= 0 && y < cell_states.GetHeight()
+                                 && "y coordinate out of range",
+                                 y, cell_states.GetHeight());
+        return cell_states(x, y);
+    }
+    EDGE_TYPE GetEdgeHValue(int x, int y) const {
+        emp_assert(x >= 0 && x < edge_states_h.GetWidth()
+                                 && "x coordinate out of range",
+                                 x, edge_states_h.GetWidth());
+        emp_assert(y >= 0 && y < edge_states_h.GetHeight()
+                                 && "y coordinate out of range",
+                                 y, edge_states_h.GetHeight());
+        return edge_states_h(x, y);
+    }
+    EDGE_TYPE GetEdgeVValue(int x, int y) const {
+        emp_assert(x >= 0 && x < edge_states_v.GetWidth()
+                                && "x coordinate out of range",
+                                x, edge_states_v.GetWidth());
+        emp_assert(y >= 0 && y < edge_states_v.GetHeight()
+                                && "y coordinate out of range",
+                                y, edge_states_v.GetHeight());
+        return edge_states_v(x, y);
+    }
+    POINT_TYPE GetPointValue(int x, int y) const {
+        emp_assert(x >= 0 && x < point_states.GetWidth()
+                                 && "x coordinate out of range",
+                                 x, point_states.GetWidth());
+        emp_assert(y >= 0 && y < point_states.GetHeight()
+                                 && "y coordinate out of range",
+                                 y, point_states.GetHeight());
+        return point_states(x, y);
+    }
 
 
     // T is always going to be CELL_TYPE but we need to do it this way to use
@@ -221,7 +253,15 @@ namespace Grid {
 
     template <typename T>
     typename std::enable_if<!std::is_void<T>::value, void>::type
-    SetCellValue(int x, int y, T value) { cell_states(x, y) = value; }
+    SetCellValue(int x, int y, T value) {
+        emp_assert(x >= 0 && x < cell_states.GetWidth()
+                                 && "x coordinate out of range",
+                                 x, cell_states.GetWidth());
+        emp_assert(y >= 0 && y < cell_states.GetHeight()
+                                 && "y coordinate out of range",
+                                 y, cell_states.GetHeight());
+        cell_states(x, y) = value;
+    }
 
     template <typename T>
     typename std::enable_if<std::is_void<T>::value, void>::type
@@ -246,7 +286,16 @@ namespace Grid {
 
     template <typename T>
     typename std::enable_if<!std::is_void<T>::value, void>::type
-    SetPointValue(int x, int y, T value) { point_states(x, y) = value; }
+    SetPointValue(int x, int y, T value) {
+        emp_assert(x >= 0 && x < point_states.GetWidth()
+                                && "x coordinate out of range",
+                                x, point_states.GetWidth());
+        emp_assert(y >= 0 && y < point_states.GetHeight()
+                                && "y coordinate out of range",
+                                y, point_states.GetHeight());
+
+        point_states(x, y) = value;
+    }
 
     template <typename T>
     typename std::enable_if<std::is_void<T>::value, void>::type
@@ -257,10 +306,28 @@ namespace Grid {
 
 
     void SetEdgeHValue(int id, EDGE_TYPE value) { edge_states_h[id] = value; }
-    void SetEdgeHValue(int x, int y, EDGE_TYPE value) { edge_states_h(x, y) = value; }
+    void SetEdgeHValue(int x, int y, EDGE_TYPE value) {
+        emp_assert(x >= 0 && x < edge_states_h.GetWidth()
+                                 && "x coordinate out of range",
+                                 x, edge_states_h.GetWidth());
+        emp_assert(y >= 0 && y < edge_states_h.GetHeight()
+                                 && "y coordinate out of range",
+                                 y, edge_states_h.GetHeight());
+
+        edge_states_h(x, y) = value;
+    }
 
     void SetEdgeVValue(int id, EDGE_TYPE value) { edge_states_v[id] = value; }
-    void SetEdgeVValue(int x, int y, EDGE_TYPE value) { edge_states_v(x, y) = value; }
+    void SetEdgeVValue(int x, int y, EDGE_TYPE value) {
+        emp_assert(x >= 0 && x < edge_states_v.GetWidth()
+                                && "x coordinate out of range",
+                                x, edge_states_v.GetWidth());
+        emp_assert(y >= 0 && y < edge_states_v.GetHeight()
+                                && "y coordinate out of range",
+                                y, edge_states_v.GetHeight());
+
+        edge_states_v(x, y) = value;
+    }
 
   };
 

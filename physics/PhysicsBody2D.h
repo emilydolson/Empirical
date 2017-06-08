@@ -46,8 +46,8 @@ namespace emp {
   struct BodyLink {
     using PhysicsBody_t = PhysicsBody2D_Base;
     BODY_LINK_TYPE type;
-    PhysicsBody_t * from;
-    PhysicsBody_t * to;
+    emp::Ptr<PhysicsBody_t> from;
+    emp::Ptr<PhysicsBody_t> to;
     double cur_dist;
     double target_dist;
     double link_strength;
@@ -69,7 +69,7 @@ namespace emp {
     double inv_mass;
     double pressure;
     double max_pressure;
-    bool destroy; // Has this body been flagged for destruction?
+    bool destroy = false; // Has this body been flagged for destruction?
     bool is_immobile;
     bool is_colliding = false;
     // Useful internal member variables:
@@ -79,11 +79,11 @@ namespace emp {
 
     // Signals:
     // TODO
-    Signal<void(BodyLink*)> on_link_update_signal;  // Triggers for each link updated on body.
+    Signal<void(emp::Ptr<BodyLink>)> on_link_update_signal;  // Triggers for each link updated on body.
 
     // Information about other bodies that this body is linked to:
-    emp::vector<BodyLink*> from_links;  // Active links initiated (from) this body.
-    emp::vector<BodyLink*> to_links;    // Active links targeting (to) this body.
+    emp::vector<emp::Ptr<BodyLink>> from_links;  // Active links initiated (from) this body.
+    emp::vector<emp::Ptr<BodyLink>> to_links;    // Active links targeting (to) this body.
 
     void RemoveFromLink(int link_id) {
       emp_assert(link_id >= 0 && link_id < (int) from_links.size());
@@ -101,12 +101,14 @@ namespace emp {
 
   public:
     virtual ~PhysicsBody2D_Base() {
+    //  std::cout << "In body destrcuto " << std::endl;
       // Delete all links
       RemoveAllLinks();
+    //   std::cout << "Done with base detructor " << std::endl;
     }
 
-    virtual Shape * GetShapePtr() = 0;
-    virtual Shape & GetShape() = 0;
+    virtual Shape* GetShapePtr() {std::cout << "NOOOOOOOOOOOOOOOO!" << std::endl;};
+    virtual Shape & GetShape() = 0 ;
     virtual const Shape & GetConstShape() const = 0;
 
     virtual const Point & GetVelocity() const { return velocity; }
@@ -146,7 +148,7 @@ namespace emp {
 
     // Creating, testing, and unlinking other bodies.
     virtual bool IsLinkedFrom(const PhysicsBody2D_Base & link_body) const {
-      for (auto * cur_link : from_links) if (cur_link->to == &link_body) return true;
+      for (auto cur_link : from_links) if (cur_link->to == &link_body) return true;
       return false;
     }
     virtual bool IsLinkedTo(const PhysicsBody2D_Base & link_body) const { return link_body.IsLinkedFrom(*this); }
@@ -159,13 +161,13 @@ namespace emp {
     virtual void AddLink(BODY_LINK_TYPE type, PhysicsBody2D_Base & link_body, double cur_dist, double target_dist, double link_strength = 0) {
       emp_assert(!IsLinked(link_body)); // Don't link twice!
       // Build connections in both directions.
-      auto * new_link = new BodyLink(type, this, &link_body, cur_dist, target_dist, link_strength);
+      auto new_link = new BodyLink(type, this, &link_body, cur_dist, target_dist, link_strength);
       from_links.push_back(new_link);
       link_body.to_links.push_back(new_link);
     }
-    virtual void RemoveLink(BodyLink * link) {
+    virtual void RemoveLink(emp::Ptr<BodyLink> link) {
       // If link is to this body, trigger remove link from source body.
-      if (link->to == this) {
+      if (link->to.Raw() == this) {
         link->from->RemoveLink(link);
         return;
       }
@@ -177,34 +179,35 @@ namespace emp {
       // Remove the TO link.
       const int to_size = (int) link->to->to_links.size();
       for (int i = 0; i < to_size; i++) {
-        if (link->to->to_links[i]->from == this) { link->to->RemoveToLink(i); break; }
+        if (link->to->to_links[i]->from.Raw() == this) { link->to->RemoveToLink(i); break; }
       }
-      delete link;
+      link.Delete();
     }
     virtual void RemoveAllLinks() {
+        // std::cout << "removing links" << from_links.size() << std::endl;
       while (from_links.size()) RemoveLink(from_links[0]);
       while (to_links.size()) RemoveLink(to_links[0]);
     }
     virtual const BodyLink & FindLink(const PhysicsBody2D_Base & link_body) const {
       emp_assert(IsLinked(link_body));
-      for (auto * link : from_links) if ( link->to == &link_body) return *link;
+      for (auto link : from_links) if ( link->to.Raw() == &link_body) return *link;
       return link_body.FindLink(*this);
     }
     virtual BodyLink & FindLink(PhysicsBody2D_Base & link_body)  {
       emp_assert(IsLinked(link_body));
-      for (auto * link : from_links) if ( link->to == &link_body) return *link;
+      for (auto link : from_links) if ( link->to.Raw() == &link_body) return *link;
       return link_body.FindLink(*this);
     }
-    virtual emp::vector<BodyLink *> GetLinksToByType(BODY_LINK_TYPE link_type) {
-      emp::vector<BodyLink *> links;
-      for (auto *link : this->to_links) {
+    virtual emp::vector<emp::Ptr<BodyLink>> GetLinksToByType(BODY_LINK_TYPE link_type) {
+      emp::vector<emp::Ptr<BodyLink>> links;
+      for (auto link : this->to_links) {
         if (link->type == link_type) links.push_back(link);
       }
       return links;
     }
-    virtual emp::vector<BodyLink *> GetLinksFromByType(BODY_LINK_TYPE link_type) {
-      emp::vector<BodyLink *> links;
-      for (auto *link : this->from_links) {
+    virtual emp::vector<emp::Ptr<BodyLink>> GetLinksFromByType(BODY_LINK_TYPE link_type) {
+      emp::vector<emp::Ptr<BodyLink>> links;
+      for (auto link : this->from_links) {
         if (link->type == link_type) links.push_back(link);
       }
       return links;
@@ -232,28 +235,31 @@ namespace emp {
     using Shape_t = SHAPE_TYPE;
     using Owner_t = PhysicsBodyOwner_Base<PhysicsBody2D<Shape_t>>;
 
-    Shape_t * shape_ptr = nullptr;
-    TrackedType * tracked_owner = nullptr;
-    Owner_t *body_owner = nullptr;
+    emp::Ptr<Shape_t> shape_ptr = nullptr;
+    emp::Ptr<TrackedType> tracked_owner = nullptr;
+    emp::Ptr<Owner_t> body_owner = nullptr;
     bool has_owner = false;
 
 
   public:
     template<typename... ARGS>
     PhysicsBody2D(ARGS... args) : tracked_owner(nullptr), has_owner(false) {
-      shape_ptr = new Shape_t(std::forward<ARGS>(args)...);
+      shape_ptr.New(Shape_t(std::forward<ARGS>(args)...));
     }
     ~PhysicsBody2D() {
+        // std::cout << "In body derived dest" << std::endl;
       if (shape_ptr) {
-        //   delete shape_ptr;
+        //   std::cout << "Deleting " << shape_ptr.Raw() << std::endl;
+          shape_ptr.Delete();
       }
       // TODO: we need to tell owner (if we have an owner) that we've deleted this body.
       //      * Currently not a huge fan of this way of doing it.
-    //   if (has_owner) body_owner->DetachBody();
+      if (has_owner) body_owner->DetachBody();
+    //   std::cout << "Done deleting body" << std::endl;
     }
 
-    Shape_t * GetShapePtr() override { return shape_ptr; }
-    Shape_t & GetShape() override { return *shape_ptr; }
+    Shape_t* GetShapePtr() override { emp_assert(!shape_ptr.IsNull()); std::cout << "getting shape ptr" << std::endl; return shape_ptr; }
+    Shape_t & GetShape() override { emp_assert(!shape_ptr.IsNull()); return *shape_ptr; }
     const Shape_t & GetConstShape() const override { return *shape_ptr; }
 
     TrackedType * GetTrackedOwnerPtr() { return tracked_owner; }
@@ -263,20 +269,32 @@ namespace emp {
     const Angle & GetOrientation() const { return shape_ptr->GetOrientation(); }
     const Point & GetAnchor() const override { return shape_ptr->GetCenter(); }
 
-    void AttachTrackedOwner(TrackedType * ptr) {
-      emp_assert(ptr != nullptr && has_owner != true);
+    void AttachTrackedOwner(emp::Ptr<TrackedType> ptr) {
+      emp_assert(!ptr.IsNull() && has_owner != true);
       tracked_owner = ptr;
       has_owner = true;
     }
-    void AttachTrackedOwner(TrackedType *ptr, Owner_t *o_ptr) {
-      emp_assert(ptr != nullptr && has_owner != true, ptr, has_owner);
+    void AttachTrackedOwner(emp::Ptr<TrackedType> ptr, emp::Ptr<Owner_t> o_ptr) {
+    //   emp_assert(!ptr.IsNull() && has_owner != true, ptr.Raw(), has_owner);
+    //   std::cout << "aabout to attach " << tracked_owner.DebugGetCount() << " " << body_owner.DebugGetCount() << " " << ptr.DebugGetCount() << " " << o_ptr.DebugGetCount() << std::endl;
+    //   std::cout << tracked_owner.Raw() << " " << ptr.Raw() << std::endl;
+    //   std::cout << body_owner.Raw() << " " << o_ptr.Raw() << std::endl;
+      if (has_owner) {
+          // So this is pretty awful - we can end up with a different tracked pointer
+          // to the same owner
+          tracked_owner.Delete();
+      }
       tracked_owner = ptr;
       body_owner = o_ptr;
       has_owner = true;
+    //   std::cout << "attaching..."<< tracked_owner.DebugGetCount() << " " << body_owner.DebugGetCount() << " " << ptr.DebugGetCount() << " " << o_ptr.DebugGetCount() <<std::endl;
     }
 
     void DetachTrackedOwner() {
-      tracked_owner = nullptr;
+      if (has_owner){
+          tracked_owner.Delete();
+          tracked_owner = nullptr;
+      }
       body_owner = nullptr;
       has_owner = false;
     }
@@ -285,7 +303,7 @@ namespace emp {
     void Update(double friction = 0) {
       // Update links.
       for (int i = 0; i < (int) from_links.size(); ++i) {
-        auto *link = from_links[i];
+        emp::Ptr<BodyLink> link = from_links[i];
         // Trigger on link update.
         on_link_update_signal.Trigger(link);
         // Is this link flagged for destruction?
@@ -333,7 +351,7 @@ namespace emp {
       total_abs_shift.ToOrigin();
 
       // If this body is linked to another, enforce the distance between them.
-      for (auto *link : from_links) {
+      for (auto link : from_links) {
         // If bodies are directly on top of one another (centers are overlapping), move this a bit.
         if (GetAnchor() == link->to->GetAnchor()) shape_ptr->Translate(Point(0.01, 0.01));
         // Figure out how much each body needs to move so that cur_dist (updated during body update step) will be correct.

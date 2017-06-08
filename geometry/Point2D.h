@@ -36,6 +36,10 @@ namespace emp {
     constexpr bool operator==(const Point2D & _in) const { return (x == _in.x) && (y == _in.y); }
     constexpr bool operator!=(const Point2D & _in) const { return (x != _in.x) || (y != _in.y); }
 
+    constexpr bool IsClose(const Point2D & _in, double epsilon = .1) const {
+        return (std::abs(x - _in.x) < epsilon) && (std::abs(y - _in.y) < epsilon);
+    }
+
     constexpr inline TYPE GetX() const { return x; }
     constexpr inline TYPE GetY() const { return y; }
     inline Point2D & SetX(TYPE in_x) { x = in_x; return *this; }

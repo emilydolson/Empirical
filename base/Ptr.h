@@ -101,7 +101,7 @@ namespace emp {
       std::cout << "EMP_TRACK_MEM: No memory leaks found!\n "
                 << total << " pointers found; "
                 << owned << " owned and "
-                << remain << " still have pointers to them (after deletion.)"                
+                << remain << " still have pointers to them (after deletion.)"
                 << std::endl;
     }
 
@@ -247,6 +247,7 @@ namespace emp {
     void Delete() {
       EMP_IF_MEMTRACK( Tracker().MarkDeleted(ptr); );
       EMP_IF_MEMTRACK( Tracker().Dec(ptr); );
+      emp_assert(ptr != nullptr);
       delete ptr;
     }
 
@@ -292,7 +293,7 @@ namespace emp {
     // Auto-case to raw pointer type.
     operator TYPE *() {
       // We should not automatically convert managed pointers to raw pointers
-      EMP_IF_MEMTRACK( emp_assert(Tracker().IsActive(ptr) == false, typeid(TYPE).name()); );
+      EMP_IF_MEMTRACK( emp_assert(Tracker().IsOwner(ptr) == false, typeid(TYPE).name()); );
       return ptr;
     }
 

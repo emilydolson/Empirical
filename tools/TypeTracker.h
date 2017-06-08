@@ -47,7 +47,8 @@ namespace emp {
     TypeTracker_Class(REAL_T && in) : value(std::forward<REAL_T>(in)) { ; }
     TypeTracker_Class(const TypeTracker_Class &) = default;
     TypeTracker_Class(TypeTracker_Class &&) = default;
-    TypeTracker_Class & operator=(const TypeTracker_Class &) = default;
+    TypeTracker_Class & operator=(TypeTracker_Class &) = default;
+    // TypeTracker_Class & operator=(const TypeTracker_Class &) = default;
     TypeTracker_Class & operator=(TypeTracker_Class &&) = default;
     virtual size_t GetTypeTrackerID() const noexcept { return ID; }
   };
@@ -138,13 +139,20 @@ namespace emp {
       emp_assert((has_type<REAL_T,TYPES...>()));    // Make sure we're wrapping a legal type.
       return wrap_t<REAL_T>(std::forward<REAL_T>(val));
     }
-    template <typename REAL_T> wrap_t<REAL_T> * New(REAL_T & val) {
+    template <typename REAL_T> emp::Ptr<wrap_t<REAL_T>> New(REAL_T & val) {
       emp_assert((has_type<REAL_T, TYPES...>()));   // Make sure we're wrapping a legal type.
-      return new wrap_t<REAL_T>(val);
+    //   std::cout << "Making tracked type with real type " << typeid(REAL_T).name() << std::endl;
+      emp::Ptr<wrap_t<REAL_T>> ptr;
+      ptr.New(val);
+      return ptr;
     }
-    template <typename REAL_T> wrap_t<REAL_T> * New(REAL_T && val) {
+    template <typename REAL_T> emp::Ptr<wrap_t<REAL_T>> New(REAL_T && val) {
       emp_assert((has_type<REAL_T, TYPES...>()));   // Make sure we're wrapping a legal type.
-      return new wrap_t<REAL_T>(std::forward<REAL_T>(val));
+// std::cout << "Makin   g tracked type with real type " << typeid(REAL_T).name() << std::endl;
+      emp::Ptr<wrap_t<REAL_T>> ptr;
+      ptr.New(std::forward<REAL_T>(val));
+    //   std::cout << "returning" <<std::endl;
+      return ptr;
     }
 
     // Test if the tracked type is TEST_T

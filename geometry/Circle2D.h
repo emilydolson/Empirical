@@ -30,6 +30,7 @@ namespace emp {
     Circle2D(const Point2D<TYPE> & _c, TYPE _r=0) : center(_c), radius(_r) { ; }
     Circle2D(TYPE _x, TYPE _y, TYPE _r=0) : center(_x,_y), radius(_r) { ; }
     Circle2D(TYPE _r=0) : center(0.0, 0.0), radius(_r) { ; }
+    Circle2D(const Circle2D<TYPE> & _circ) : center(_circ.center), radius(_circ.radius) { ; }
 
     const Point2D<TYPE> & GetCenter() const override { return center; }
     TYPE GetCenterX() const override { return center.GetX(); }

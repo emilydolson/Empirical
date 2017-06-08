@@ -82,7 +82,7 @@ namespace evo {
 
     size_t AddOrgAt(Ptr<ORG> new_org, size_t pos) {
       emp_assert(pos < pop.size());   // Make sure we are placing into a legal position.
-      if (pop[pos]) { pop[pos].Delete(); --num_orgs; }
+      if (pop[pos]) { std::cout << "deleting " << pos << std::endl; pop[pos].Delete(); --num_orgs; }
       pop[pos] = new_org;
       fitM.ClearAt(pos);
       ++num_orgs;

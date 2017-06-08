@@ -98,6 +98,12 @@ namespace emp {
     return true;
   }
 
+  namespace web{
+      template <typename T>
+      std::string Live(T && val) {
+          return "hi";
+      }
+  }
 
 }
 
