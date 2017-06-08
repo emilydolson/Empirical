@@ -38,7 +38,7 @@ using maze_genome_t = emp::vector<emp::array<double, 2> >;
 
 const double MAZE_SIZE = 10;
 const double MAX_TIME = 1000;
-constexpr size_t POP_SIZE = 3;
+constexpr size_t POP_SIZE = 10;
 constexpr size_t GENOME_SIZE = 50;
 const emp::Grid::Layout layout(MAZE_SIZE, MAZE_SIZE);
 
@@ -191,7 +191,8 @@ public:
           auto owner_it = body_owners.begin();
           for (auto body_it = bodies.begin(); body_it != bodies.end(); ++body_it) {
               emp_assert(owner_it != body_owners.end());
-              owner_it->AttachBody(*body_it);
+              emp::Ptr<emp::PhysicsBody2D<emp::Rect>> b(&(*body_it));
+              owner_it->AttachBody(b);
               body_it->SetImmobile(true);
               owner_it->SetBodyCleanup(false);
               ++owner_it;
@@ -448,11 +449,7 @@ public:
     //   std::cout << "done with next eval" << std::endl;
   }
 
-  void EvaluateCurrSolver() {
-      std::cout << "Evaluating solver" << std::endl;
-      solver_t & solver = solvers[curr_solver];
-      solver.genome.ResetHardware();
-
+  void PopulateRangeFinders(solver_t & solver) {
       emp::Point center = solver.GetBodyPtr()->GetShape().GetCenter();
       solver.range_finders[0] = emp::Line(center, emp::Point(center.GetX()+physics.GetWidth(), center.GetY()));
       solver.range_finders[1] = emp::Line(center, emp::Point(center.GetX()+physics.GetWidth()*0.5774, center.GetY()+physics.GetWidth()));
@@ -482,7 +479,17 @@ public:
           solver.genome.SetInput(i, closest);
 
       }
-      std::cout << "done with range finders" << std::endl;
+
+  }
+
+  void EvaluateCurrSolver() {
+    //   std::cout << "Evaluating solver" << std::endl;
+      solver_t & solver = solvers[curr_solver];
+      solver.genome.ResetHardware();
+
+      PopulateRangeFinders(solver);
+
+    //   std::cout << "done with range finders" << std::endl;
       solver.genome.Process(200);
     //   std::cout << solver.genome.GetOutput(0) << " " << solver.genome.GetOutput(1) << std::endl;
       solver.GetBody().IncVelocity(emp::Point(solver.genome.GetOutput(0), solver.genome.GetOutput(1)));
@@ -497,11 +504,7 @@ public:
         //   std::cout << solver.GetBodyPtr()->GetShape().GetCenter() << std::endl;
           solver.stalled_steps = 0;
       }
-      std::cout << "done with running gp" << std::endl;
-      if (!solver.HasBody()) {
-          std::cout << "NO BODY! " << curr_solver << std::endl;
-        //   std::cout << solver.GetBodyPtr().Raw() << std::endl;
-      }
+    //   std::cout << "done with running gp" << std::endl;
       solver.GetBody();
       emp::Point v = solver.GetBody().GetVelocity();
       if (v.GetX() >= 10) {
@@ -515,14 +518,14 @@ public:
       } else if(v.GetY() <= -10){
           v.SetY(-9.9);
       }
-  std::cout << "veloctiy: " << v << std::endl;
+
       solver.GetBody().SetVelocity(v);
 
       physics.Update();
     //   std::cout << "physics updated " << v << std::endl;
       curr_time++;
-      if (curr_time > MAX_TIME || center.Distance(emp::Point(physics.GetWidth(), physics.GetHeight())) < 30) {
-          double score = center.Distance(emp::Point(physics.GetWidth(), physics.GetHeight()));
+      if (curr_time > MAX_TIME || solver.GetBody().GetShape().GetCenter().Distance(emp::Point(physics.GetWidth(), physics.GetHeight())) < 30) {
+          double score = solver.GetBody().GetShape().GetCenter().Distance(emp::Point(physics.GetWidth(), physics.GetHeight()));
           solver.GetBody().GetShape().SetCenter(20,20);
           if (!score) {
               solver.fitness++;
@@ -534,35 +537,7 @@ public:
       }
 
       #ifdef EMSCRIPTEN
-      center = solver.GetBodyPtr()->GetShape().GetCenter();
-      solver.range_finders[0] = emp::Line(center, emp::Point(center.GetX()+physics.GetWidth(), center.GetY()));
-      solver.range_finders[1] = emp::Line(center, emp::Point(center.GetX()+physics.GetWidth()*0.5774, center.GetY()+physics.GetWidth()));
-      solver.range_finders[2] = emp::Line(center, emp::Point(center.GetX()+physics.GetWidth()*0.5774, center.GetY()-physics.GetWidth()));
-      solver.range_finders[3] = emp::Line(center, emp::Point(center.GetX()-physics.GetWidth(), center.GetY()));
-      solver.range_finders[4] = emp::Line(center, emp::Point(center.GetX()-physics.GetWidth()*0.5774, center.GetY()-physics.GetWidth()));
-      solver.range_finders[5] = emp::Line(center, emp::Point(center.GetX()-physics.GetWidth()*0.5774, center.GetY()+physics.GetWidth()));
-
-      for (int i =0; i < solver.range_finders.size(); i++) {
-          emp::vector<emp::Rect> intersected;
-          for (auto body : physics.GetBodySet()) {
-              if (physics.body_tt.IsType<emp::Ptr<emp::PhysicsBody2D<emp::Rect>>>(*body)) {
-                  if (solver.range_finders[i].Intersects(physics.body_tt.ToType<emp::Ptr<emp::PhysicsBody2D<emp::Rect>>>(*body)->GetShape())) {
-                      intersected.push_back(physics.body_tt.ToType<emp::Ptr<emp::PhysicsBody2D<emp::Rect>>>(*body)->GetShape());
-                  }
-              }
-          }
-          double closest = physics.GetWidth()*physics.GetWidth();
-          emp::Point closest_p = center;
-          for (auto rect : intersected) {
-              if (center.Distance(rect.GetCenter()) < closest) {
-                  closest = center.Distance(rect.GetCenter());
-                  closest_p = rect.GetCenter();
-              }
-          }
-          solver.range_finders[i].SetP2(closest_p);
-          solver.genome.SetInput(i, closest);
-
-      }
+      PopulateRangeFinders(solver);
       #endif
 
   }
@@ -588,7 +563,7 @@ int main() {
 
 #ifndef EMSCRIPTEN
 WebInterface interface(1000,1000);
-while (interface.GetGeneration() < 10){
+while (interface.GetGeneration() < 5){
     interface.EvaluateCurrSolver();
 }
 

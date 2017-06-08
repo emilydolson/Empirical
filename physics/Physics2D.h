@@ -352,7 +352,7 @@ namespace emp {
             // Has this body been flagged for removal?
             // TODO: check to make sure physics is still managing this body?
             if (GetDestroyFlag(body_set[cur_id])) {
-             std::cout << "delete flagged body mixed" << std::endl;
+            //  std::cout << "delete flagged body mixed" << std::endl;
               body_set[cur_id].Delete();
               --cur_size;
               body_set[cur_id] = nullptr;
@@ -475,16 +475,19 @@ namespace emp {
 
             if (body_tt.IsType<emp::Ptr<PhysicsBody2D<Rect>>>(*body1)) {
                 if (body_tt.IsType<emp::Ptr<PhysicsBody2D<Rect>>>(*body2)) {
-                    body_tt.ToType<emp::Ptr<PhysicsBody2D<Rect>>>(*body1)->TriggerCollision(body_tt.ToType<emp::Ptr<PhysicsBody2D<Rect>>>(*body2));
+                    body_tt.ToType<emp::Ptr<PhysicsBody2D<Rect>>>(*(body1))->TriggerCollision(body_tt.ToType<emp::Ptr<PhysicsBody2D<Rect>>>(*(body2)));
                 } else {
-                    body_tt.ToType<emp::Ptr<PhysicsBody2D<Rect>>>(*body1)->TriggerCollision(body_tt.ToType<emp::Ptr<PhysicsBody2D<Circle>>>(*body2));
+                    //This line makes emp::Ptr angry and I have no idea why
+                    // std::cout << "why now?" << std::endl;
+                    body_tt.ToType<emp::Ptr<PhysicsBody2D<Rect>>>(*(body1))->TriggerCollision(body_tt.ToType<emp::Ptr<PhysicsBody2D<Circle>>>(*(body2)));
+                    // std::cout << "why?" << std::endl;
                 }
             } else {
                 if (body_tt.IsType<emp::Ptr<PhysicsBody2D<Rect>>>(*body2)) {
-                    std::cout << body2.DebugGetCount() << std::endl;
-                    body_tt.ToType<emp::Ptr<PhysicsBody2D<Circle>>>(*body1)->TriggerCollision(body_tt.ToType<emp::Ptr<PhysicsBody2D<Rect>>>(*body2));
+                    // std::cout << body2.DebugGetCount() << std::endl;
+                    body_tt.ToType<emp::Ptr<PhysicsBody2D<Circle>>>(*(body1))->TriggerCollision(body_tt.ToType<emp::Ptr<PhysicsBody2D<Rect>>>(*(body2)));
                 } else {
-                    body_tt.ToType<emp::Ptr<PhysicsBody2D<Circle>>>(*body1)->TriggerCollision(body_tt.ToType<emp::Ptr<PhysicsBody2D<Circle>>>(*body2));
+                    body_tt.ToType<emp::Ptr<PhysicsBody2D<Circle>>>(*(body1))->TriggerCollision(body_tt.ToType<emp::Ptr<PhysicsBody2D<Circle>>>(*(body2)));
                 }
 
             }
@@ -542,7 +545,7 @@ namespace emp {
           if (!HasOverlap(body1, body2)) return false;
           // Must be touching, collision!
           TriggerCollision(body1, body2);   // Give bodies opportunity to respond to the collision.
-          TriggerCollision(body2, body1);
+        //   TriggerCollision(body2, body1);
           // Give owners opportunity to respond to collision. TODO: what if no owners?
         //   if (IsColliding(body1) || IsColliding(body2))
         //     body_owner_tt.RunFunction(GetTrackedOwnerPtr(body1), GetTrackedOwnerPtr(body2));
@@ -703,6 +706,9 @@ namespace emp {
           } else {
               std::cout << "WTFFFFF" << std::endl;
           }
+
+          circ->ResolveCollision();
+          rect->ResolveCollision();
         //   std::cout << "Xoverlap " << xoverlap << " Yoverlap: " << yoverlap <<std::endl;
         }
 

@@ -329,7 +329,6 @@ namespace evo {
 
     void InsertBirth(const ORG mem, size_t parent_pos, size_t copy_count=1) {
       before_repro_sig.Trigger(parent_pos);
-      std::cout << "org " << parent_pos << " is reproducing" << std::endl;
       for (size_t i = 0; i < copy_count; i++) {
         Ptr<ORG> new_org;
         new_org.New(mem);

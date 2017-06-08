@@ -29,14 +29,8 @@ namespace emp {
 
     virtual ~PhysicsBodyOwner_Base() {
         // std::cout <<"CALLING DEST" << std::endl;
-      if (has_body && body_cleanup) {
-        emp_assert(!body.IsNull());
-        body.Delete();
-        DetachBody();
-      } else if (has_body && !body_cleanup) {
         // body->FlagForDestruction();
         DetachBody();
-      }
     }
 
     virtual emp::Ptr<BODY_TYPE> GetBodyPtr() { emp_assert(has_body); emp_assert(!body.IsNull()); return body; };
@@ -51,7 +45,13 @@ namespace emp {
       has_body = true;
     }
     virtual void DetachBody() {
-      if (has_body) body->DetachTrackedOwner();
+      if (has_body) {
+          emp_assert(!body.IsNull());
+          body->DetachTrackedOwner();
+          if (body_cleanup) {
+             body.Delete();
+          }
+      }
       body = nullptr;
       has_body = false;
     }
