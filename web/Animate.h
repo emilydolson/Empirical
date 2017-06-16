@@ -125,7 +125,7 @@ namespace web {
     Animate(const std::function<void()> & fun, W_TYPES&... targets)
       : Animate([fun](const Animate &){fun();}, targets...) { ; }
 
-    virtual ~Animate() { ; }
+    virtual ~Animate() { JSDelete(callback_id); }
 
     // Do not copy animations directly.
     Animate(const Animate &) = delete;

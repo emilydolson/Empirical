@@ -31,6 +31,8 @@ namespace web {
     Listeners(const Listeners &) = default;
     Listeners & operator=(const Listeners &) = default;
 
+    ~Listeners(){Clear();}
+
     size_t GetSize() const { return listeners.size(); }
 
     // Use a pre-calculated function ID.
@@ -64,6 +66,9 @@ namespace web {
 
     void Clear() {
       // @CAO: Delete functions to be called.
+      for (auto l : listeners) {
+          JSDelete(l.second);
+      }
       listeners.clear();
     }
 

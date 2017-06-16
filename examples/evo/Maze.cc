@@ -205,6 +205,7 @@ public:
 class Solver : public emp::PhysicsBodyOwner_Base<emp::PhysicsBody2D<emp::Circle> > {
 public:
     using Body_t = emp::PhysicsBody2D<emp::Circle>;
+    Body_t static_body;
     emp::AvidaGP genome;
     emp::array<emp::Line, 6> range_finders;
     double fitness = 0;
@@ -214,17 +215,19 @@ public:
     // Body_t& GetBody(){return *body;}
     // emp::Ptr<Body_t> GetBodyPtr(){return body;}
 
-    Solver(emp::AvidaGP genome) : genome(genome) {
-        body.New(20, 20, 10);
+    Solver(emp::AvidaGP genome) : genome(genome), static_body(20,20,10) {
+
+        body = emp::Ptr<Body_t>(&static_body);
         // std::cout << body.Raw() << std::endl;
         AttachBody(body);
-        // SetBodyCleanup(false);
+        SetBodyCleanup(false);
     }
 
-    Solver(const Solver& s) : genome(s.genome) {
-        body.New(20,20,10);
+    Solver(const Solver& s) : genome(s.genome), static_body(20,20,10) {
+        body = emp::Ptr<Body_t>(&static_body);
         // std::cout << "new copy " << body.Raw() << std::endl;
         AttachBody(body);
+        SetBodyCleanup(false);
     }
 
     ~Solver(){
@@ -346,6 +349,8 @@ private:
 public:
 
     int GetGeneration(){ return generation;}
+
+    ~WebInterface(){canvas.Clear();}
 
     WebInterface(double width, double height) : doc("emp_base"),
                                                 canvas(doc.AddCanvas(width, height, "maze")),
