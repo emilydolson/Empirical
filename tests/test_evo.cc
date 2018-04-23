@@ -7,7 +7,6 @@
 #include "Evolve/NK-const.h"
 #include "Evolve/World.h"
 #include "Evolve/Resource.h"
-#include "Evolve/EvoStats.h"
 #include "Evolve/NK.h"
 
 #include "tools/BitSet.h"
@@ -34,12 +33,14 @@ TEST_CASE("Test fitness sharing", "[evo]")
     pop.Inject(next_org);
   }
 
+  emp::EcoSelect(pop, fit_funs, 1000, 5, POP_SIZE);
 
   // Setup the (shared) fitness function.
   pop.SetSharedFitFun( [](BitOrg &org){ return 10 + N - org.CountOnes(); },
                        [](BitOrg& org1, BitOrg& org2){ return (double)(org1.XOR(org2)).CountOnes();},
                        10, 1 );
 
+  std::cout << "--- Grid example ---\n";
 
   REQUIRE(pop.CalcFitnessID(0) == 0.50);
 
@@ -93,9 +94,6 @@ TEST_CASE("Test fitness sharing", "[evo]")
   grid_world.SetPrintFun(print_fun);
 
   emp_assert(grid_world.GetSize() == POP_SIZE); // POP_SIZE needs to be a perfect square.
-  test.open("temp/Result-grid.csv");
-  correct.open("data/Result-grid.csv");
-
 
   grid_world.InjectAt(30, side+1);
   grid_world.InjectAt(4, side*(side+1)/2);
@@ -156,14 +154,16 @@ TEST_CASE("Test resources", "[evo]")
 
   emp::vector<std::function<double(const BitOrg&)> > fit_funs;
 
-<<<<<<< HEAD
+
   fit_funs.push_back([](const BitOrg &org){ return org.CountOnes()/N; });
   fit_funs.push_back([](const BitOrg &org){ return org[0]; });
   fit_funs.push_back([](const BitOrg &org){ return 1 - org[0]; });
-=======
+
   test.open("temp/Result-mixed.csv");
   correct.open("data/Result-mixed.csv");
->>>>>>> 4c62a6dd50239c12c63807dfab0a0c5d87233fde
+  fit_funs.push_back([](const BitOrg &org){ return org.CountOnes()/N; });
+  fit_funs.push_back([](const BitOrg &org){ return org[0]; });
+  fit_funs.push_back([](const BitOrg &org){ return 1 - org[0]; });
 
   emp::ResourceSelect(pop, fit_funs, resources, 5, POP_SIZE);
 

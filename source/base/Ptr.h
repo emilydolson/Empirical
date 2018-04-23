@@ -1,7 +1,7 @@
 /**
  *  @note This file is part of Empirical, https://github.com/devosoft/Empirical
  *  @copyright Copyright (C) Michigan State University, MIT Software license; see doc/LICENSE.md
- *  @date 2016-2017
+ *  @date 2016-2018
  *
  *  @file Ptr.h
  *  @brief A wrapper for pointers that does careful memory tracking (but only in debug mode).
@@ -16,7 +16,9 @@
  *  allow you to track the pointer more easily in a debugger.
  *
  *  @todo Track information about emp::vector and emp::array objects to make sure we don't
- *    point directly into them? (A resize() could make such pointers invalid!)
+ *    point directly into them? (A resize() could make such pointers invalid!) Or better, warn
+ *    it vector memory could have moved.
+ *  @todo Get working with threads
  */
 
 #ifndef EMP_PTR_H
@@ -72,46 +74,58 @@ namespace emp {
     }
 
     /// What pointer does this one hold information about?
-    const void * GetPtr() const { return ptr; }
+    const void * GetPtr() const noexcept { return ptr; }
 
     /// How many Ptr objects point to the associated position?
-    int GetCount() const { return count; }
+    int GetCount() const noexcept { return count; }
 
     /// If this ptr is to an array, how many bytes large is the array (may be different from size!)
-    size_t GetArrayBytes() const { return array_bytes; }
+    size_t GetArrayBytes() const noexcept { return array_bytes; }
 
     /// Is this pointer currently valid to access?
-    bool IsActive() const { return (bool) status; }
+    bool IsActive() const noexcept { return (bool) status; }
 
     /// Is this pointer pointing to an array?
-    bool IsArray()  const { return status == PtrStatus::ARRAY; }
+    bool IsArray() const noexcept { return status == PtrStatus::ARRAY; }
 
     /// Denote that this pointer is an array.
-    void SetArray(size_t bytes) { array_bytes = bytes; status = PtrStatus::ARRAY; }
+    void SetArray(size_t bytes) noexcept { array_bytes = bytes; status = PtrStatus::ARRAY; }
 
     /// Add one more pointer.
-    void Inc() {
+    void Inc(size_t id) {
       if (ptr_debug) std::cout << "Inc info for pointer " << ptr << std::endl;
-      emp_assert(status != PtrStatus::DELETED, "Incrementing deleted pointer!");
+      emp_assert(status != PtrStatus::DELETED, "Incrementing deleted pointer!", id);
       count++;
     }
 
     /// Remove a pointer.
-    void Dec() {
+    void Dec(size_t id) {
       if (ptr_debug) std::cout << "Dec info for pointer " << ptr << std::endl;
 
       // Make sure that we have more than one copy, -or- we've already deleted this pointer
-      emp_assert(count > 1 || status == PtrStatus::DELETED, "Removing last reference to owned Ptr!");
+      emp_assert(count > 1 || status == PtrStatus::DELETED, "Removing last reference to owned Ptr!", id);
       count--;
     }
 
     /// Indicate that the associated position has been deleted.
     void MarkDeleted() {
       if (ptr_debug) std::cout << "Marked deleted for pointer " << ptr << std::endl;
-      emp_assert(status != PtrStatus::DELETED, "Deleting same emp::Ptr a second time!");
       status = PtrStatus::DELETED;
     }
 
+    /// Debug utility to determine if everything looks okay with this pointer's information.
+    bool OK() const noexcept {
+      if (ptr == nullptr) return false;     // Should not have info for a null pointer.
+      if (status == PtrStatus::ARRAY) {
+        if (array_bytes == 0) return false; // Arrays cannot be size 0.
+        if (count == 0) return false;       // Active arrays must have pointers to them.
+      }
+      if (status == PtrStatus::ACTIVE) {
+        if (array_bytes > 0) return false;  // non-arrays must be array size 0.
+        if (count == 0) return false;       // Active pointers must have references to them.
+      }
+      return true;
+    }
   };
 
 
@@ -120,6 +134,7 @@ namespace emp {
   private:
     std::unordered_map<const void *, size_t> ptr_id;  ///< Associate raw pointers with unique IDs
     emp::vector<PtrInfo> id_info;                     ///< Associate IDs with pointer information.
+    static constexpr size_t UNTRACKED_ID = (size_t) -1;
 
     // Make PtrTracker a singleton.
     PtrTracker() : ptr_id(), id_info() {
@@ -130,7 +145,6 @@ namespace emp {
     PtrTracker & operator=(const PtrTracker &) = delete;
     PtrTracker & operator=(PtrTracker &&) = delete;
 
-    PtrInfo & GetInfo(const void * ptr) { return id_info[ptr_id[ptr]]; }
   public:
     ~PtrTracker() {
       // Track stats about pointer record.
@@ -154,6 +168,10 @@ namespace emp {
     /// Treat this class as a singleton with a single Get() method to retrieve it.
     static PtrTracker & Get() { static PtrTracker tracker; return tracker; }
 
+    /// Get the info associated with an existing pointer.
+    PtrInfo & GetInfo(const void * ptr) { return id_info[ptr_id[ptr]]; }
+    PtrInfo & GetInfo(size_t id) { return id_info[id]; }
+
     /// Determine if a pointer is being tracked.
     bool HasPtr(const void * ptr) const {
       if (ptr_debug) std::cout << "HasPtr: " << ptr << std::endl;
@@ -171,7 +189,7 @@ namespace emp {
 
     /// Check if an ID is for a pointer that has been deleted.
     bool IsDeleted(size_t id) const {
-      if (id == (size_t) -1) return false;   // Not tracked!
+      if (id == UNTRACKED_ID) return false;   // Not tracked!
       if (ptr_debug) std::cout << "IsDeleted: " << id << std::endl;
       return !id_info[id].IsActive();
     }
@@ -223,30 +241,31 @@ namespace emp {
 
     /// Increment the nuber of Pointers associated with an ID
     void IncID(size_t id) {
-      if (id == (size_t) -1) return;   // Not tracked!
+      if (id == UNTRACKED_ID) return;   // Not tracked!
       if (ptr_debug) std::cout << "Inc:    " << id << std::endl;
-      id_info[id].Inc();
+      id_info[id].Inc(id);
     }
 
     /// Decrement the nuber of Pointers associated with an ID
     void DecID(size_t id) {
-      if (id == (size_t) -1) return;   // Not tracked!
+      if (id == UNTRACKED_ID) return;   // Not tracked!
       auto & info = id_info[id];
       if (ptr_debug) std::cout << "Dec:    " << id << "(" << info.GetPtr() << ")" << std::endl;
       emp_assert(info.GetCount() > 0, "Decrementing Ptr, but already zero!",
                  id, info.GetPtr(), info.IsActive());
-      info.Dec();
+      info.Dec(id);
     }
 
     /// Mark the pointers associated with this ID as deleted.
     void MarkDeleted(size_t id) {
 #ifdef EMP_ABORT_PTR_DELETE
       if (id == EMP_ABORT_PTR_DELETE) {
-        std::cerr << "Aborting at creation of Ptr id " << id << std::endl;
+        std::cerr << "Aborting at deletion of Ptr id " << id << std::endl;
         abort();
       }
 #endif
       if (ptr_debug) std::cout << "Delete: " << id << std::endl;
+      emp_assert(id_info[id].IsActive(), "Deleting same emp::Ptr a second time!", id);
       id_info[id].MarkDeleted();
     }
   };
@@ -283,11 +302,13 @@ namespace emp {
     size_t id;                  ///< A unique ID for this pointer type.
     using element_type = TYPE;  ///< Type being pointed at.
 
+    static constexpr size_t UNTRACKED_ID = (size_t) -1;
+
     static PtrDebug & DebugInfo() { static PtrDebug info; return info; } // Debug info for each type
     static PtrTracker & Tracker() { return PtrTracker::Get(); }  // Single tracker for al Ptr types
 
     /// Construct a null Ptr by default.
-    Ptr() : ptr(nullptr), id((size_t) -1) {
+    Ptr() : ptr(nullptr), id(UNTRACKED_ID) {
       if (ptr_debug) std::cout << "null construct: " << ptr << std::endl;
     }
 
@@ -300,13 +321,14 @@ namespace emp {
     /// Construct using move constructor
     Ptr(Ptr<TYPE> && _in) : ptr(_in.ptr), id(_in.id) {
       if (ptr_debug) std::cout << "move construct: " << ptr << std::endl;
-      _in.id = (size_t) -1;
+      _in.ptr = nullptr;
+      _in.id = UNTRACKED_ID;
       // No IncID or DecID in Tracker since we just move the id.
     }
 
     /// Construct from a raw pointer of campatable type.
     template <typename T2>
-    Ptr(T2 * in_ptr, bool track=false) : ptr(in_ptr), id((size_t) -1)
+    Ptr(T2 * in_ptr, bool track=false) : ptr(in_ptr), id(UNTRACKED_ID)
     {
       if (ptr_debug) std::cout << "raw construct: " << ptr << ". track=" << track << std::endl;
       emp_assert( (PtrIsConvertable<T2, TYPE>(in_ptr)) );
@@ -325,7 +347,7 @@ namespace emp {
 
     /// Construct from a raw pointer of campatable ARRAY type.
     template <typename T2>
-    Ptr(T2 * _ptr, size_t array_size, bool track) : ptr(_ptr), id((size_t) -1)
+    Ptr(T2 * _ptr, size_t array_size, bool track) : ptr(_ptr), id(UNTRACKED_ID)
     {
       const size_t array_bytes = array_size * sizeof(T2);
       if (ptr_debug) std::cout << "raw ARRAY construct: " << ptr
@@ -426,7 +448,7 @@ namespace emp {
     void NewArray(size_t array_size, T &&... args) {
       Tracker().DecID(id);                              // Remove a pointer to any old memory...
 
-      // @CAO: This next portion of code is allocating an array of the appropriat type.
+      // @CAO: This next portion of code is allocating an array of the appropriate type.
       //       We are currently using "new", but should shift over to malloc since new throws an
       //       exception when there's a problem, which will trigger an abort in Emscripten mode.
       //       We'd rather be able to identify a more specific problem.
@@ -442,15 +464,15 @@ namespace emp {
       DebugInfo().AddPtr();
     }
 
-    /// Delete this pointer (ust NOT be an array).
+    /// Delete this pointer (must NOT be an array).
     void Delete() {
       emp_assert(id < Tracker().GetNumIDs(), id, "Deleting Ptr that we are not resposible for.");
       emp_assert(ptr, "Deleting null Ptr.");
       emp_assert(Tracker().IsArrayID(id) == false, id, "Trying to delete array pointer as non-array.");
-      Tracker().MarkDeleted(id);
-      DebugInfo().RemovePtr();
       if (ptr_debug) std::cout << "Ptr::Delete() : " << ptr << std::endl;
       delete ptr;
+      Tracker().MarkDeleted(id);
+      DebugInfo().RemovePtr();
     }
 
     /// Delete this pointer to an array (must be an array).
@@ -458,10 +480,10 @@ namespace emp {
       emp_assert(id < Tracker().GetNumIDs(), id, "Deleting Ptr that we are not resposible for.");
       emp_assert(ptr, "Deleting null Ptr.");
       emp_assert(Tracker().IsArrayID(id), id, "Trying to delete non-array pointer as array.");
-      Tracker().MarkDeleted(id);
-      DebugInfo().RemovePtr();
       if (ptr_debug) std::cout << "Ptr::DeleteArray() : " << ptr << std::endl;
       delete [] ptr;
+      Tracker().MarkDeleted(id);
+      DebugInfo().RemovePtr();
     }
 
     /// Convert this pointer to a hash value.
@@ -487,14 +509,14 @@ namespace emp {
 
     /// Move assignment
     Ptr<TYPE> & operator=(Ptr<TYPE> && _in) {
-      if (ptr_debug) std::cout << "move assignment" << std::endl;
+      if (ptr_debug) std::cout << "move assignment: " << _in.ptr << std::endl;
       emp_assert(Tracker().IsDeleted(_in.id) == false, _in.id, "Do not move deleted pointers.");
-      if (id != _in.id) {
+      if (ptr != _in.ptr) {
         Tracker().DecID(id);   // Decrement references to former pointer at this position.
         ptr = _in.ptr;
         id = _in.id;
         _in.ptr = nullptr;
-        _in.id = (size_t) -1;
+        _in.id = UNTRACKED_ID;
       }
       return *this;
     }
@@ -516,7 +538,7 @@ namespace emp {
       }
       // Otherwise, since this ptr was passed in as a raw pointer, we do not manage it.
       else {
-        id = (size_t) -1;
+        id = UNTRACKED_ID;
       }
 
       return *this;
@@ -593,7 +615,7 @@ namespace emp {
       emp_assert(Tracker().IsDeleted(id) == false /*, typeid(TYPE).name() */, id);
 
       // We should not automatically convert managed pointers to raw pointers; use .Raw()
-      emp_assert(id == (size_t) -1 /*, typeid(TYPE).name() */, id);
+      emp_assert(id == UNTRACKED_ID /*, typeid(TYPE).name() */, id);
       return ptr;
     }
 
@@ -643,6 +665,19 @@ namespace emp {
 
     /// Some debug testing functions
     int DebugGetCount() const { return Tracker().GetIDCount(id); }
+    bool DebugIsArray() const { return Tracker().IsArrayID(id); }
+    size_t DebugGetArrayBytes() const { return Tracker().GetArrayBytes(id); }
+
+    bool OK() const {
+      // Untracked ID's should not have pointers in the Tracker.
+      if (id == UNTRACKED_ID) return !Tracker().HasPtr(ptr);
+
+      // Make sure this pointer is linked to the correct info.
+      if (Tracker().GetInfo(id).GetPtr() != ptr) return false;
+
+      // And make sure that info itself is okay.
+      return Tracker().GetInfo(id).OK();
+    }
 
     // Prevent use of new and delete on Ptr
     // static void* operator new(std::size_t) noexcept {
@@ -744,6 +779,11 @@ namespace emp {
     bool operator>(const TYPE * in_ptr)  const { return ptr > in_ptr; }
     bool operator>=(const TYPE * in_ptr) const { return ptr >= in_ptr; }
 
+    // Stubs for debug-related functions when outside debug mode.
+    int DebugGetCount() const { return -1; }
+    bool DebugIsArray() const { return false; }
+    size_t DebugGetArrayBytes() const { return 0; }
+    bool OK() const { return true; }
   };
 
 #endif
@@ -765,11 +805,13 @@ namespace emp {
     return is;
   }
 
-
-  // Create a helper to replace & operator.
+  /// Convert a T* to a Ptr<T>.  By default, don't track.
   template <typename T> Ptr<T> ToPtr(T * _in, bool own=false) { return Ptr<T>(_in, own); }
+
+  /// Convert a T* to a Ptr<T> that we DO track.
   template <typename T> Ptr<T> TrackPtr(T * _in, bool own=true) { return Ptr<T>(_in, own); }
 
+  /// Create a new Ptr of the target type; use the args in the constructor.
   template <typename T, typename... ARGS> Ptr<T> NewPtr(ARGS &&... args) {
     //auto ptr = new T(std::forward<ARGS>(args)...);
     auto ptr = (T*) malloc (sizeof(T));         // Build a new raw pointer.
@@ -778,19 +820,34 @@ namespace emp {
     return Ptr<T>(ptr, true);
   }
 
-  template <typename T, typename... ARGS> Ptr<T> NewArrayPtr(size_t array_size, ARGS &&... args) {
-    //auto ptr = new T[array_size];
-    const size_t alloc_size = array_size * sizeof(T);
-    auto ptr = (T*) malloc (alloc_size);  // Build a new raw pointer.
-    emp_assert(ptr, array_size);                      // No exceptions in emscripten; assert alloc!
-    for (size_t i = 0; i < array_size; i++) {         // Loop through all array elements.
-      new (ptr + i*sizeof(T)) T(args...);             //    ...and initialize them.
-    }
-    return Ptr<T>(ptr, array_size, true);
+  /// Copy an object pointed to and return a Ptr to the copy.
+  template <typename T> Ptr<T> CopyPtr(Ptr<T> in) { return NewPtr<T>(*in); }
+
+  /// Copy a vector of objects pointed to; return a vector of Ptrs to the new copies.
+  template <typename T> emp::vector<Ptr<T>> CopyPtrs(const emp::vector<Ptr<T>> & in) {
+    emp::vector<Ptr<T>> out_ptrs(in.size());
+    for (size_t i = 0; i < in.size(); i++) out_ptrs[i] = CopyPtr(in[i]);
+    return out_ptrs;
   }
 
+  /// Copy a vector of objects pointed to by using their Clone() member function; return vector.
+  template <typename T> emp::vector<Ptr<T>> ClonePtrs(const emp::vector<Ptr<T>> & in) {
+    emp::vector<Ptr<T>> out_ptrs(in.size());
+    for (size_t i = 0; i < in.size(); i++) out_ptrs[i] = in[i]->Clone();
+    return out_ptrs;
+  }
 
-
+  /// Create a pointer to an array of objects.
+  template <typename T, typename... ARGS> Ptr<T> NewArrayPtr(size_t array_size, ARGS &&... args) {
+    auto ptr = new T[array_size];                     // Build a new raw pointer.
+    // const size_t alloc_size = array_size * sizeof(T);
+    // auto ptr = (T*) malloc (alloc_size);
+    emp_assert(ptr, array_size);                      // No exceptions in emscripten; assert alloc!
+    // for (size_t i = 0; i < array_size; i++) {         // Loop through all array elements.
+    //   new (ptr + i*sizeof(T)) T(args...);             //    ...and initialize them.
+    // }
+    return Ptr<T>(ptr, array_size, true);
+  }
 
 
 }
