@@ -248,7 +248,6 @@ namespace emp {
 
     /// How many organisms can fit in the world?
     size_t GetSize() const { return pop.size(); }
-    size_t size() const { return pop.size(); } // For compatibility with STL containers
 
     /// How many organisms are currently in the world?
     size_t GetNumOrgs() const { return num_orgs; }
@@ -343,8 +342,6 @@ namespace emp {
 
     /// Retrive the genome corresponding to the organism at the specified position.
     const genome_t & GetGenomeAt(size_t id) { return fun_get_genome(GetOrg(id)); }
-
-    const genotype_t & GetGenotypeAt(size_t id) {return genotypes[id];}
 
     /// Get the systematics manager (which is tracking lineages in the population.)
     const Systematics<genome_t> & GetSystematics() const { return systematics; }
