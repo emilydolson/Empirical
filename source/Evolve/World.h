@@ -241,6 +241,9 @@ namespace emp {
       Clear();
       if (random_owner) random_ptr.Delete();
       if (data_node_fitness) data_node_fitness.Delete();
+      for (auto file : files) {
+        file.Delete();
+      }
     }
 
     // --- Accessing Organisms or info ---
