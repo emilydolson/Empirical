@@ -144,7 +144,7 @@ namespace emp {
 
     /// If Update is called with an update number, call the full version of update only if the update value
     /// passes the timing function (that is, the timing function returns true).
-    void Update(size_t update) { if (timing_fun(update)) Update(); }
+    virtual void Update(size_t update) { if (timing_fun(update)) Update(); }
 
 
     /// If a function takes an ostream, pass in the correct one.

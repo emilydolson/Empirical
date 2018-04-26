@@ -163,7 +163,7 @@ namespace emp {
     bool cache_on;                  ///< Should we be caching fitness values?
     std::vector<size_t> pop_sizes;  ///< Sizes of population dimensions (eg, 2 vals for grid)
     emp::TraitSet<ORG> phenotypes;  ///< What phenotypes are we tracking?
-    emp::vector<DataFile> files;    ///< Output files.
+    emp::vector<emp::Ptr<DataFile>> files;    ///< Output files.
 
     bool is_synchronous;            ///< Does this world have synchronous generations?
     bool is_space_structured;       ///< Do we have a spatially structured population?
@@ -266,10 +266,13 @@ namespace emp {
     /// What phenotypic traits is the population tracking?
     const emp::TraitSet<ORG> & GetPhenotypes() const { return phenotypes; }
 
+    /// Add an already-constructed datafile.
+    DataFile & AddDataFile(emp::Ptr<DataFile> file);
+
     /// Lookup a file by name.
     DataFile & GetFile(const std::string & filename) {
-      for (DataFile & file : files) {
-        if (file.GetFilename() == filename) return file;
+      for (emp::Ptr<DataFile> file : files) {
+        if (file->GetFilename() == filename) return *file;
       }
       emp_assert(!"Trying to lookup a file that does not exist.", filename);
     }
@@ -878,12 +881,22 @@ namespace emp {
     SetAttribute("PopStruct", "Grid");
   }
 
+    // Add a new data file constructed elsewhere.
+    template<typename ORG>
+    DataFile & World<ORG>::AddDataFile(emp::Ptr<DataFile> file) {
+      size_t id = files.size();
+      files.push_back(file);
+      return *files[id];
+    }
+
+
   // A new, arbitrary file.
   template<typename ORG>
   DataFile & World<ORG>::SetupFile(const std::string & filename) {
     size_t id = files.size();
-    files.emplace_back(filename);
-    return files[id];
+    files.emplace_back();
+    files[id].New(filename);
+    return *files[id];
   }
 
   // A data file (default="fitness.csv") that contains information about the population's fitness.
@@ -971,7 +984,7 @@ namespace emp {
     }
 
     // 3. Handle any data files that need to be printed this update.
-    for (auto & file : files) file.Update(update);
+    for (auto file : files) file->Update(update);
 
     // 4. Increment the current update number; i.e., count calls to Update().
     update++;
