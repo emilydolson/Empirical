@@ -494,7 +494,7 @@ namespace emp {
       if (dists.size() != (active_taxa.size()*(active_taxa.size()-1))/2) {
         // The tree is not connected
         // Technically this means the mean distance is infinite.
-        return INFINITY;
+        return emp::vector<int>({-1});
       }
 
       // std::cout << "Total: " << total << "Dists: " << dists.size() << std::endl;
