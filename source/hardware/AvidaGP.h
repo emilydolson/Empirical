@@ -404,9 +404,11 @@ namespace emp {
 
     /// Print out a single instruction, with its arguments.
     void PrintInst(const inst_t & inst, std::ostream & os=std::cout) const;
+    void PrintInstHTML(const inst_t & inst, std::ostream & os=std::cout) const;
 
     /// Print out this program.
     void PrintGenome(std::ostream & os=std::cout) const;
+    void PrintGenomeHTML(std::ostream & os=std::cout) const;
     void PrintGenome(const std::string & filename) const;
 
     /// Figure out which instruction is going to actually be run next SingleProcess()
@@ -448,6 +450,42 @@ namespace emp {
     const size_t num_args = genome.inst_lib->GetNumArgs(inst.id);
     for (size_t i = 0; i < num_args; i++) {
       os << ' ' << inst.args[i];
+    }
+  }
+
+  template <typename HARDWARE>
+  void AvidaCPU_Base<HARDWARE>::PrintInstHTML(const inst_t & inst, std::ostream & os) const {
+    os << genome.inst_lib->GetName(inst.id);
+    const size_t num_args = genome.inst_lib->GetNumArgs(inst.id);
+    for (size_t i = 0; i < num_args; i++) {
+      os << "&nbsp;" << inst.args[i];
+    }
+  }
+
+  template <typename HARDWARE>
+  void AvidaCPU_Base<HARDWARE>::PrintGenomeHTML(std::ostream & os) const {
+    size_t cur_scope = 0;
+
+    for (const inst_t & inst : genome.sequence) {
+      size_t new_scope = InstScope(inst);
+
+      if (new_scope) {
+        if (new_scope == cur_scope) {
+          for (size_t i = 0; i < cur_scope; i++) os << "&nbsp;";
+          os << "----<br>";
+        }
+        if (new_scope < cur_scope) {
+          cur_scope = new_scope-1;
+        }
+      }
+
+      for (size_t i = 0; i < cur_scope; i++) os << "&nbsp;";
+      PrintInstHTML(inst, os);
+      if (new_scope) {
+        if (new_scope > cur_scope) os << " --> ";
+        cur_scope = new_scope;
+      }
+      os << "<br>";
     }
   }
 
