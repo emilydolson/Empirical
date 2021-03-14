@@ -70,10 +70,10 @@ namespace emp {
 
        // Setup info to track fitnesses.
        emp::vector<double> base_fitness(world.GetSize());
-       emp::vector< emp::vector<double> > extra_fitnesses(extra_funs.size());
-       for (size_t i=0; i < extra_funs.size(); i++) {
-         extra_fitnesses[i].resize(world.GetSize());
-       }
+    //    emp::vector< emp::vector<double> > extra_fitnesses(extra_funs.size());
+    //    for (size_t i=0; i < extra_funs.size(); i++) {
+    //      extra_fitnesses[i].resize(world.GetSize());
+    //    }
 
        // Collect all fitness info.
     //    std::cout << extra_funs.size() << std::endl;
@@ -87,7 +87,7 @@ namespace emp {
          if (use_base) {
             base_fitness[org_id] = world.CalcFitnessID(org_id);
          } else {
-            base_fitness[org_id] = 0;
+            base_fitness[org_id] = 1;
          }
 
          for (size_t ex_id = 0; ex_id < extra_funs.size(); ex_id++) {
@@ -95,23 +95,24 @@ namespace emp {
 
            pools[ex_id].Inc(pools[ex_id].GetInflow()/world.GetNumOrgs());
            double cur_fit = extra_funs[ex_id](world.GetOrg(org_id));
-           cur_fit = emp::Pow(cur_fit, 2.0);
-            //    if (org_id==0) {std::cout << "Allele: " << world[org_id][ex_id] <<" Curr fit: " << extra_funs[ex_id](world[org_id]) << " Curr fit squared: " << cur_fit << " Amount: " << pools[ex_id].GetAmount() << " Frac: " << frac;}
-            cur_fit *= frac*(pools[ex_id].GetAmount()-cost);
             if (cur_fit > min_score) {
+                cur_fit = emp::Pow(cur_fit, 2.0);
+                cur_fit *= frac*(pools[ex_id].GetAmount());
                 cur_fit -= cost;
+                cur_fit = std::min(cur_fit, max_bonus);
             } else {
                 cur_fit = 0;
             }
+        //     if (org_id==0) {std::cout << "Allele: " << world[org_id].phenotype[ex_id] <<" Curr fit: " << extra_funs[ex_id](world.GetOrg(org_id)) << " Curr fit squared: " << cur_fit << " Amount: " << pools[ex_id].GetAmount() << " Frac: " << frac;}
         //    if (org_id==0) {std::cout << " Multiplied out: " << cur_fit;}
-           cur_fit = std::min(cur_fit, max_bonus);
+           
         //    if (org_id==0) {std::cout << " Final: " << cur_fit << std::endl;}
-           extra_fitnesses[ex_id][org_id] = emp::Pow2(cur_fit);
+        //    extra_fitnesses[ex_id][org_id] = emp::Pow2(cur_fit);
         //    std::cout << "Fit before:  = " << base_fitness[org_id] << "   Res: " << pools[ex_id].GetAmount();
            base_fitness[org_id] *= emp::Pow2(cur_fit);
            pools[ex_id].Dec(std::abs(cur_fit));
-        //    std::cout << "   Bonus " << ex_id << " = " << extra_funs[ex_id](world[org_id]) << " "<< emp::Pow(2.0,cur_fit) << " " << emp::to_string(world[org_id])
-        // //              << "   fitnes = " << base_fitness[org_id]
+        //    std::cout << "   Bonus " << ex_id << " = " << extra_funs[ex_id](world.GetOrg(org_id)) << " "<< emp::Pow(2.0,cur_fit) << " " << emp::to_string(world[org_id].phenotype)
+        //              << "   fitnes = " << base_fitness[org_id]
         //              << std::endl;
 
          }
@@ -119,7 +120,7 @@ namespace emp {
 
     //    std::cout << "Resource allocations" << std::endl;
     //    std::cout << emp::to_string(base_fitness) << std::endl;
-    //    std::cout << emp::to_string(world[0]) << std::endl;
+    //    std::cout << emp::to_string(world[0].phenotype) << std::endl;
     //    std::cout << world.CalcFitnessID(0);
 
     //    for (size_t ex_id = 0; ex_id < extra_funs.size(); ex_id++) {

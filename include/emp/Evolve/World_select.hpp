@@ -190,7 +190,7 @@ namespace emp {
   /// @param max_funs The maximum number of fitness functions to use. (use 0 for all; default)
   template<typename ORG>
   void LexicaseSelect(World<ORG> & world,
-                      const emp::vector< std::function<double(const ORG &)> > & fit_funs,
+                      const emp::vector< std::function<double(ORG &)> > & fit_funs,
                       size_t repro_count=1,
                       size_t max_funs=0)
   {
@@ -269,7 +269,7 @@ namespace emp {
   /// @param max_funs The maximum number of fitness functions to use. (use 0 for all; default)
   template<typename ORG>
   void OptimizedLexicaseSelect(World<ORG> & world,
-                      const emp::vector< std::function<double(const ORG &)> > & fit_funs,
+                      const emp::vector< std::function<double(ORG &)> > & fit_funs,
                       size_t repro_count=1,
                       size_t max_funs=0)
   {

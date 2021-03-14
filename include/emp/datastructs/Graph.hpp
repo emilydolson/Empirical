@@ -332,6 +332,37 @@ namespace emp {
       }
     }
 
+    /// Print a symmetric graph in dot format to the provided output stream (defaulting to standard out)
+    void PrintSymDotFormat(std::ostream & os=std::cout) {
+      os << "graph {";
+
+      for (size_t from = 0; from < nodes.size(); from++) {
+        for (size_t to=from+1; to < nodes.size(); to++) {
+          if (HasEdge(from, to) == false) continue;
+          double weight = GetWeight(from, to);
+          os << from << " -- " << to << "[label=\"" << weight << "\"], weight=\"" << weight << "\"];"  << std::endl;
+        }
+      }
+
+      os << "}" << std::endl;
+    }
+
+    /// Print a directed graph in dot format to the provided output stream (defaulting to standard out)
+    void PrintDirectedDotFormat(std::ostream & os=std::cout) {
+      os << "digraph {";
+
+      for (size_t from = 0; from < nodes.size(); from++) {
+        for (size_t to = 0; to < nodes.size(); to++) {
+          if (HasEdge(from, to) == false) continue;
+          double weight = GetWeight(from, to);
+          os << from << " -> " << to << "[label=\"" << weight << "\", weight=\"" << weight << "\"];"  << std::endl;
+        }
+      }
+
+      os << "}" << std::endl;
+    }
+
+
     /// @returns the weights for all edges in the graph
     emp::vector<emp::vector<double> > GetWeights(){return weights;}
 
