@@ -93,6 +93,15 @@ namespace emp {
         return fitness.GetMean();
       }
 
+      bool HasMutationType(const std::string & mut_name) const {
+        return emp::Has(mut_counts, mut_name);
+      }
+
+      int GetMutationCount(const std::string & mut_name) const {
+        emp_assert(emp::Has(mut_counts, mut_name), "Unknown mutation type", mut_name);
+        return mut_counts.at(mut_name);
+      }
+
       void RecordMutation(std::unordered_map<std::string, int> muts) {
         for (auto mut : muts) {
           if (Has(mut_counts, mut.first)) {
@@ -1361,7 +1370,29 @@ namespace emp {
     }
 
     /// Request a pointer to the Most-Recent Common Ancestor for the population.
-    Ptr<taxon_t> GetMRCA(bool force=false) const;
+    Ptr<taxon_t> GetMRCA(bool force=false) const {
+      if (!mrca && num_roots == 1) {  // Determine if we need to calculate the MRCA.
+        // First, find a candidate among the living taxa.  Only taxa that have one offsrping
+        // can be on the line-of-descent to the MRCA, so anything else is a good start point.
+        // There must be at least one!  Stop as soon as we find a candidate.
+        Ptr<taxon_t> candidate(nullptr);
+        for (auto x : active_taxa) {
+          if (x->GetNumOff() != 1) { candidate = x; break; }
+        }
+
+        // Now, trace the line of descent, updating the candidate as we go.
+        Ptr<taxon_t> test_taxon = candidate->GetParent();
+        while (test_taxon) {
+          emp_assert(test_taxon->GetNumOff() >= 1);
+          // If the test_taxon is dead, we only want to update candidate when we hit a new branch point
+          // If test_taxon is still alive, though, we always need to update it
+          if (test_taxon->GetNumOff() > 1 || test_taxon->GetNumOrgs() > 0) candidate = test_taxon;
+          test_taxon = test_taxon->GetParent();
+        }
+        mrca = candidate;
+      }
+      return mrca;
+    }
 
     /// Request the depth of the Most-Recent Common Ancestor; return -1 for none.
     int GetMRCADepth() const;
@@ -1420,14 +1451,7 @@ namespace emp {
     if (store_ancestors) ancestor_taxa.erase(taxon); // Clear from ancestors set (if there)
     if (store_outside) outside_taxa.insert(taxon);   // Add to outside set (if tracked)
     else {
-      if (mrca) {
-          std::cout << "Pruning: " << taxon->GetID() << " " << mrca->GetID() << std::endl;
-      } else {
-        std::cout << "Pruning, mrca already null" << taxon->GetID();
-      }
-
       if (taxon == mrca) {
-        std::cout << "Setting mrca to null" << std::endl;
         mrca = nullptr;
       }
       taxon.Delete();                             //  ...or else get rid of it.
@@ -1443,7 +1467,6 @@ namespace emp {
     // If the taxon is still active AND the is the current mrca AND now has only one offspring,
     // clear the MRCA for lazy re-evaluation later.
     else if (taxon == mrca && taxon->GetNumOff() == 1) { 
-      std::cout << "MRCa only has one offspring" << std::endl;
       mrca = nullptr;
     }
   }
@@ -1491,32 +1514,6 @@ namespace emp {
     if (taxon->GetNumOff() == 0) Prune(taxon);         // ...and prune from there if needed.
   }
 
-
-  Request a pointer to the Most-Recent Common Ancestor for the population.
-  template <typename ORG, typename ORG_INFO, typename DATA_STRUCT>
-  Ptr<typename Systematics<ORG, ORG_INFO, DATA_STRUCT>::taxon_t> Systematics<ORG, ORG_INFO, DATA_STRUCT>::GetMRCA() const {
-    if (!mrca && num_roots == 1) {  // Determine if we need to calculate the MRCA.
-      // First, find a candidate among the living taxa.  Only taxa that have one offsrping
-      // can be on the line-of-descent to the MRCA, so anything else is a good start point.
-      // There must be at least one!  Stop as soon as we find a candidate.
-      Ptr<taxon_t> candidate(nullptr);
-      for (auto x : active_taxa) {
-        if (x->GetNumOff() != 1) { candidate = x; break; }
-      }
-
-      // Now, trace the line of descent, updating the candidate as we go.
-      Ptr<taxon_t> test_taxon = candidate->GetParent();
-      while (test_taxon) {
-        emp_assert(test_taxon->GetNumOff() >= 1);
-        // If the test_taxon is dead, we only want to update candidate when we hit a new branch point
-        // If test_taxon is still alive, though, we always need to update it
-        if (test_taxon->GetNumOff() > 1 || test_taxon->GetNumOrgs() > 0) candidate = test_taxon;
-        test_taxon = test_taxon->GetParent();
-      }
-      mrca = candidate;
-    }
-    return mrca;
-  }
 
   // Request the depth of the Most-Recent Common Ancestor; return -1 for none.
   template <typename ORG, typename ORG_INFO, typename DATA_STRUCT>
