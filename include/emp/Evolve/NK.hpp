@@ -74,6 +74,9 @@ namespace emp {
     NKLandscape & operator=(const NKLandscape &) = delete;
     NKLandscape & operator=(NKLandscape &&) = default;
 
+    /// Return full landscape
+    const emp::vector< emp::vector<double> > & GetLandscape() const { return landscape; };
+
     /// Randomize the landscape without changing the landscape size.
     void Reset(emp::Random & random) {
       emp_assert(K < 32, K);
